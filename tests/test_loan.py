@@ -1,27 +1,25 @@
 """Tests for LoanApplication model."""
 
 import pytest
-from src.models.loan import LoanApplication
+from src.models.application import LoanApplication
 
 
 class TestLoanApplicationCalculateDTI:
-    """Test suite for calculate_dti() method."""
-    
+    """Test suite for DTI property and calculation."""    
     def test_calculate_dti_with_known_values(self) -> None:
         """Test DTI calculation with known values."""
-        # DTI = (monthly_debt / monthly_income)
-        # monthly_income = annual_income / 12
-        # Example: annual_income=120000 (10000/month), monthly_debt=2000
-        # DTI = 2000 / 10000 = 0.2 (20%)
+        # expected DTI = 0.20 for given inputs
         app = LoanApplication(
             borrower_name="John Doe",
             loan_amount=300000,
             fico_score=750,
             monthly_debt=2000,
             annual_income=120000,
+            property_value=350000,
+            employment_years=5,
         )
         
-        dti = app.calculate_dti()
+        dti = app.dti
         assert dti == pytest.approx(0.2), "DTI should be 0.2 (20%)"
     
     def test_calculate_dti_high_debt(self) -> None:
@@ -34,25 +32,27 @@ class TestLoanApplicationCalculateDTI:
             fico_score=720,
             monthly_debt=3000,
             annual_income=100000,
+            property_value=250000,
+            employment_years=3,
         )
         
-        dti = app.calculate_dti()
+        dti = app.dti
         assert dti == pytest.approx(3000 / (100000 / 12)), "DTI calculation incorrect"
         assert dti > 0.35, "DTI should be above 35%"
     
-    def test_calculate_dti_zero_income_returns_infinity(self) -> None:
-        """Test DTI calculation with zero income (edge case)."""
-        app = LoanApplication(
-            borrower_name="No Income",
-            loan_amount=100000,
-            fico_score=600,
-            monthly_debt=1000,
-            annual_income=0,
-        )
-        
-        dti = app.calculate_dti()
-        assert dti == float('inf'), "DTI should be infinity with zero income"
-    
+    def test_calculate_dti_zero_income_validation_error(self) -> None:
+        """Annual income must be >0; zero income should raise validation error."""
+        with pytest.raises(Exception) as exc_info:
+            LoanApplication(
+                borrower_name="No Income",
+                loan_amount=100000,
+                fico_score=600,
+                monthly_debt=1000,
+                annual_income=0,
+                property_value=100000,
+                employment_years=0,
+            )
+        assert "annual_income" in str(exc_info.value), "Zero income should trigger validation error"    
     def test_calculate_dti_zero_debt(self) -> None:
         """Test DTI calculation with no monthly debt."""
         app = LoanApplication(
@@ -61,9 +61,11 @@ class TestLoanApplicationCalculateDTI:
             fico_score=800,
             monthly_debt=0,
             annual_income=80000,
+            property_value=200000,
+            employment_years=2,
         )
         
-        dti = app.calculate_dti()
+        dti = app.dti
         assert dti == 0.0, "DTI should be 0 with no debt"
 
 
@@ -78,6 +80,8 @@ class TestLoanApplicationIsEligible:
             fico_score=800,
             monthly_debt=1000,
             annual_income=150000,
+            property_value=400000,
+            employment_years=10,
         )
         
         assert app.is_eligible() is True, "Should be eligible with excellent FICO and low DTI"
@@ -90,9 +94,11 @@ class TestLoanApplicationIsEligible:
             fico_score=680,  # Just below 700 threshold
             monthly_debt=2000,
             annual_income=120000,  # DTI ≈ 0.2 (good)
+            property_value=220000,
+            employment_years=4,
         )
         
-        dti = app.calculate_dti()
+        dti = app.dti
         assert dti < 0.36, "DTI should be acceptable"
         assert app.is_eligible() is False, "Should NOT be eligible with FICO < 700"
     
@@ -104,6 +110,8 @@ class TestLoanApplicationIsEligible:
             fico_score=700,  # Exactly at 700 threshold
             monthly_debt=2500,
             annual_income=120000,  # DTI ≈ 0.25 (good)
+            property_value=300000,
+            employment_years=6,
         )
         
         assert app.is_eligible() is True, "Should be eligible with FICO >= 700"
@@ -119,9 +127,11 @@ class TestLoanApplicationIsEligible:
             fico_score=750,  # Good FICO
             monthly_debt=3583,
             annual_income=100000,  # DTI ≈ 0.43 (43%)
+            property_value=450000,
+            employment_years=2,
         )
         
-        dti = app.calculate_dti()
+        dti = app.dti
         assert dti > 0.36, "DTI should exceed 36% threshold"
         assert app.is_eligible() is False, "Should NOT be eligible with DTI > 36%"
     
@@ -135,9 +145,11 @@ class TestLoanApplicationIsEligible:
             fico_score=750,
             monthly_debt=3000,
             annual_income=100000,  # DTI ≈ 0.36
+            property_value=325000,
+            employment_years=5,
         )
         
-        dti = app.calculate_dti()
+        dti = app.dti
         assert dti == pytest.approx(0.36, abs=0.001), "DTI should be ~36%"
         # Note: is_eligible() uses strict < 0.36, so at exactly 0.36 it's NOT eligible
         assert app.is_eligible() is False, "Should NOT be eligible with DTI >= 36%"
@@ -150,6 +162,8 @@ class TestLoanApplicationIsEligible:
             fico_score=650,  # Below threshold
             monthly_debt=1500,
             annual_income=120000,  # DTI ≈ 0.15 (excellent)
+            property_value=210000,
+            employment_years=2,
         )
         
         assert app.is_eligible() is False, "Should NOT be eligible regardless of DTI if FICO < 700"
@@ -162,9 +176,11 @@ class TestLoanApplicationIsEligible:
             fico_score=800,  # Excellent
             monthly_debt=4000,
             annual_income=100000,  # DTI ≈ 0.48 (too high)
+            property_value=600000,
+            employment_years=8,
         )
         
-        dti = app.calculate_dti()
+        dti = app.dti
         assert dti > 0.36, "DTI should exceed threshold"
         assert app.is_eligible() is False, "Should NOT be eligible regardless of FICO if DTI >= 36%"
     
@@ -176,6 +192,8 @@ class TestLoanApplicationIsEligible:
             fico_score=699,  # Just below 700
             monthly_debt=3600,
             annual_income=100000,  # DTI ≈ 0.43 (above 0.36)
+            property_value=420000,
+            employment_years=1,
         )
         
         assert app.is_eligible() is False, "Should NOT be eligible when either condition fails"
@@ -192,10 +210,12 @@ class TestLoanApplicationIntegration:
             fico_score=750,
             monthly_debt=2000,
             annual_income=120000,
+            property_value=300000,
+            employment_years=3,
         )
         
         # Calculate DTI
-        dti = app.calculate_dti()
+        dti = app.dti
         assert isinstance(dti, float), "DTI should be a float"
         
         # Check eligibility

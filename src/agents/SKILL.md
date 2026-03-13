@@ -866,7 +866,7 @@ python -m src.exercises.day4_prompt_test
 - **Orchestrator Agent:** [src/agents/orchestrator.py](orchestrator.py)
 - **Prompt Loader:** [src/utils/prompt_loader.py](../utils/prompt_loader.py)
 - **Bedrock Config:** [src/config/bedrock.py](../config/bedrock.py)
-- **Models:** [src/models/loan.py](../models/loan.py)
+- **Models:** [src/models/application.py](../models/application.py), [src/models/decision.py](../models/decision.py) (Pydantic models)
 - **Prompts:** [src/prompts/](../prompts/)
 - **LangChain Docs:** [LangChain Python](https://python.langchain.com/)
 - **LangGraph Docs:** [LangGraph State Management](https://langchain-ai.github.io/langgraph/)
