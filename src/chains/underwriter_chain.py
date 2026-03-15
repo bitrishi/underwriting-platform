@@ -1,50 +1,117 @@
-"""LangChain chains for underwriting workflows.
+# src/chains/underwriter_chain.py
 
-This module provides pre-configured chains that integrate prompts,
-LLMs, and structured output parsing for the underwriting system.
-"""
-
-from langchain_core.prompts import ChatPromptTemplate
+import json
+import logging
+from langchain_core.messages import SystemMessage, HumanMessage
+from pydantic import ValidationError
 
 from src.config.bedrock import create_llm
-from src.config.settings import settings
+from src.models.application import LoanApplication
 from src.models.decision import LoanDecision
 from src.utils.prompt_loader import load_prompt
 
+logger = logging.getLogger(__name__)
 
-def create_underwriter_chain():
-    """Create a LangChain chain for the underwriter agent.
 
-    This chain loads the underwriter prompt, configures the Bedrock LLM,
-    and sets up structured output parsing to return LoanDecision objects.
-
-    The chain expects input as a dictionary with an 'application_data' key
-    containing the formatted borrower information string.
-
-    Returns:
-        A LangChain chain that takes application data and returns LoanDecision.
+class UnderwriterChain:
     """
-    # Load the underwriter system prompt
-    system_prompt = load_prompt("underwriter")
+    Production-grade underwriting evaluation chain.
 
-    # Create the chat prompt template
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", system_prompt),
-        ("human", "{application_data}")
-    ])
+    Combines:
+    - System prompt loaded from src/prompts/underwriter.txt
+    - Bedrock LLM with temperature=0 (deterministic)
+    - Pydantic validation on output
+    - Fallback parsing for models without function calling
 
-    # Create the LLM with appropriate configuration
-    llm = create_llm(temperature=0, max_tokens=1024)
+    Java equivalent: A @Service class with @Autowired dependencies
+    that processes a request and returns a typed response.
+    """
 
-    # Configure structured output based on model capabilities
-    model_id = settings.bedrock_model_id.lower()
-    if "nova-micro" in model_id:
-        # Nova Micro supports json_mode for better structured output
-        structured_llm = llm.with_structured_output(LoanDecision, method="json_mode")
-    else:
-        # Default structured output for other models
-        structured_llm = llm.with_structured_output(LoanDecision)
+    def __init__(self):
+        """Initialize chain with LLM, prompt, and structured output."""
+        self.llm = create_llm(temperature=0)
+        self.system_prompt = load_prompt("underwriter")
+        logger.info("UnderwriterChain initialized")
 
-    # Create and return the chain
-    chain = prompt | structured_llm
-    return chain
+    def evaluate(self, application: LoanApplication) -> LoanDecision:
+        """
+        Evaluate a loan application and return a typed decision.
+
+        Args:
+            application: Validated LoanApplication with borrower data
+
+        Returns:
+            LoanDecision with decision, confidence, reasoning trace
+
+        Raises:
+            ValidationError: If LLM output doesn't match schema
+            Exception: If Bedrock API call fails
+        """
+        messages = [
+            SystemMessage(content=self.system_prompt),
+            HumanMessage(content=application.to_prompt_string()),
+        ]
+
+        # Try structured output first
+        try:
+            structured_llm = self.llm.with_structured_output(
+                LoanDecision,
+                method="json_mode"
+            )
+            result = structured_llm.invoke(messages)
+            logger.info(
+                f"Evaluation complete: {result.decision} "
+                f"(confidence: {result.confidence})"
+            )
+            return result
+
+        except Exception as e:
+            logger.warning(f"Structured output failed, using fallback: {e}")
+            return self._fallback_parse(messages)
+
+    def _fallback_parse(self, messages) -> LoanDecision:
+        """
+        Fallback: invoke raw LLM, parse JSON, validate with Pydantic.
+
+        Used when with_structured_output doesn't work
+        (e.g., Nova Micro without function calling support).
+        """
+        response = self.llm.invoke(messages)
+        raw_text = response.content
+
+        # Strip markdown code fences if present
+        clean_text = raw_text.strip()
+        if clean_text.startswith("```"):
+            clean_text = clean_text.split("\n", 1)[1]
+        if clean_text.endswith("```"):
+            clean_text = clean_text.rsplit("```", 1)[0]
+        clean_text = clean_text.strip()
+
+        # Parse JSON and validate with Pydantic
+        data = json.loads(clean_text)
+        result = LoanDecision.model_validate(data)
+
+        logger.info(
+            f"Fallback evaluation complete: {result.decision} "
+            f"(confidence: {result.confidence})"
+        )
+        return result
+
+    def evaluate_safe(self, application: LoanApplication) -> LoanDecision | None:
+        """
+        Safe evaluation with full error handling.
+
+        Returns None on failure instead of raising.
+        Logs all errors for debugging.
+        """
+        try:
+            return self.evaluate(application)
+        except ValidationError as e:
+            logger.error(f"Output validation failed: {e.errors()}")
+            return None
+        except json.JSONDecodeError as e:
+            logger.error(f"JSON parsing failed: {e}")
+            return None
+        except Exception as e:
+            logger.error(f"Evaluation failed: {e}")
+            return None
