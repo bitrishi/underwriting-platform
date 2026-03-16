@@ -115,3 +115,39 @@ class UnderwriterChain:
         except Exception as e:
             logger.error(f"Evaluation failed: {e}")
             return None
+        
+
+    # In src/chains/underwriter_chain.py, add:
+
+def evaluate_streaming(self, application: LoanApplication) -> LoanDecision:
+    """
+    Evaluate with real-time streaming output.
+
+    Shows the LLM's response token-by-token as it generates,
+    then parses the complete response into a LoanDecision.
+    """
+    messages = [
+        SystemMessage(content=self.system_prompt),
+        HumanMessage(content=application.to_prompt_string()),
+    ]
+
+    # Collect full response while streaming to console
+    full_response = ""
+    print("\n🤔 Agent thinking...\n")
+
+    for chunk in self.llm.stream(messages):
+        token = chunk.content
+        print(token, end="", flush=True)
+        full_response += token
+
+    print("\n\n✅ Response complete. Validating...\n")
+
+    # Parse and validate the complete response
+    clean = full_response.strip()
+    if clean.startswith("```"):
+        clean = clean.split("\n", 1)[1]
+    if clean.endswith("```"):
+        clean = clean.rsplit("```", 1)[0]
+
+    data = json.loads(clean.strip())
+    return LoanDecision.model_validate(data)    
