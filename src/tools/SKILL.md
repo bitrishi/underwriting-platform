@@ -1,99 +1,79 @@
-# Underwriting Tools and Callbacks Documentation
+# Tools SKILL — Underwriting And Policy Tooling
 
-## Tool Design Rules
+## Overview
 
-### Single Responsibility Principle
-Each tool performs exactly one underwriting calculation or check:
-- `calculate_dti`: Debt-to-income ratio calculation only
-- `calculate_ltv`: Loan-to-value ratio calculation only  
-- `check_fico_eligibility`: FICO score eligibility assessment only
+The `src/tools/` package provides agent-callable tools for:
+- underwriting calculations (`DTI`, `LTV`, `FICO`)
+- data-fetch simulation for borrower pipelines
+- policy and compliance retrieval via RAG-backed search
 
-### Structured Returns
-All tools return a consistent dictionary structure with:
-- `pass` or `eligible`: Boolean indicating threshold compliance
-- `threshold`: Numeric threshold value used
-- `detail`: Human-readable explanation string
-- Additional calculation-specific fields (e.g., `dti`, `ltv`, `tier`)
+All tools are exposed with `@tool` and are designed for deterministic, structured
+outputs that agents can reason over.
 
-### Docstring Requirements
-Every tool must include:
-- Purpose description with "Use this tool to..." guidance
-- Args section with type hints and descriptions
-- Returns section describing the output structure
-- Input validation error descriptions
+## Underwriting Calculation Tools
 
-## Underwriting Tools
+### `calculate_dti`
+- Input: `annual_income`, `monthly_debt`
+- Output: `dti`, threshold, pass/fail, detail
+- Validation: income must be positive
 
-### calculate_dti
-**Purpose**: Calculate the debt-to-income ratio for underwriting to evaluate borrower's debt burden against their income.
+### `calculate_ltv`
+- Input: `loan_amount`, `property_value`
+- Output: `ltv`, PMI requirement, pass/fail, detail
+- Validation: property value must be positive
 
-**Input Schema**:
-- `annual_income: float` - Borrower's annual income in dollars (must be positive)
-- `monthly_debt: float` - Borrower's total monthly debt payments in dollars
+### `check_fico_eligibility`
+- Input: `fico_score`
+- Output: minimum threshold, risk tier, eligibility, detail
+- Validation: FICO range 300-850
 
-**Output Schema**:
-```python
-{
-    "dti": float,        # Calculated DTI percentage
-    "threshold": 43,     # DTI threshold (43%)
-    "pass": bool,        # True if DTI <= 43%
-    "detail": str        # Formatted explanation (e.g., "DTI 35.2% <= 43% threshold")
-}
-```
+## Fetch Pipeline Tools
 
-### calculate_ltv
-**Purpose**: Calculate Loan-to-Value ratio for mortgage underwriting to assess how much of the property value is being financed.
+### `pull_borrower_data`
+- Input: `app_id`
+- Output: borrower profile dictionary from simulated application store
 
-**Input Schema**:
-- `loan_amount: float` - Requested loan amount in USD
-- `property_value: float` - Appraised property value in USD (must be positive)
+### `pull_credit_report`
+- Input: `ssn_last_four`
+- Output: simulated bureau report including FICO and delinquency summary
 
-**Output Schema**:
-```python
-{
-    "ltv": float,        # Calculated LTV percentage (rounded to 2 decimals)
-    "threshold": 80.0,   # PMI requirement threshold (80%)
-    "requires_pmi": bool,# True if LTV > 80%
-    "pass": bool,        # True if LTV <= 95%
-    "detail": str        # Formatted explanation (e.g., "LTV 75.0% — No PMI")
-}
-```
+### `pull_employment_history`
+- Input: `ssn_last_four`
+- Output: simulated employment verification record
 
-### check_fico_eligibility
-**Purpose**: Check if a FICO score meets minimum underwriting requirements to evaluate creditworthiness against lending thresholds.
+## Policy And Compliance Retrieval Tools
 
-**Input Schema**:
-- `fico_score: int` - Borrower's FICO credit score (300-850 range)
+### `search_lending_policies`
+- Inputs:
+  - `query: str`
+  - `jurisdiction: str` (for example `federal`, `state_texas`)
+  - `loan_type: str` (for example `conventional`, `fha`, `va`, `all`)
+- Behavior:
+  - Runs semantic policy search over FAISS vector store
+  - Applies jurisdiction-aware source filtering
+  - Incorporates loan type into semantic query context
+  - If FAISS index is stale/mismatched, auto-rebuilds from `data/policies`
+- Output:
+  - formatted document snippets with source citations
 
-**Output Schema**:
-```python
-{
-    "fico": int,              # Input FICO score
-    "minimum_threshold": 680, # Minimum eligible score
-    "tier": str,              # Risk tier ("EXCELLENT", "GOOD", "ACCEPTABLE", "BELOW_MINIMUM")
-    "eligible": bool,         # True if score >= 680
-    "detail": str             # Formatted explanation (e.g., "FICO 750 — EXCELLENT")
-}
-```
+### `search_compliance_rules`
+- Inputs:
+  - `query: str`
+  - `regulation_type: str` (for example `TRID`, `RESPA`, `TILA`)
+- Behavior:
+  - Uses regulation aliases to narrow retrieval focus
+  - Returns formatted citations from matching policy/compliance docs
 
-## Callback Tracer
+## Design Rules
 
-### UnderwritingTracer
-**Purpose**: Callback handler that traces tool and LLM activity for underwriting runs, providing audit trails and debugging information.
+- Keep each tool focused on one responsibility.
+- Validate inputs and fail fast for invalid values.
+- Return machine-friendly structures for non-RAG calculators.
+- For retrieval tools, always include source-oriented output context.
 
-**Tracked Events**:
-- `tool_start`: When a tool execution begins (includes tool name and input)
-- `tool_end`: When a tool execution completes (includes output)
-- `llm_start`: When LLM inference begins (includes prompts)
-- `agent_finish`: When agent execution completes (includes final output)
+## Testing Guidance
 
-**Event Structure**:
-Each trace entry includes:
-- `event`: Event type string
-- `timestamp`: ISO format timestamp
-- Additional event-specific fields (input, output, prompts, etc.)
-
-**Methods**:
-- `get_trace_summary()`: Returns human-readable timeline of all events with numbered entries and formatted details
-
-**Usage**: Instantiate `UnderwritingTracer()`, pass to agent execution, call `get_trace_summary()` after completion for audit logs.
+- Unit tests for underwriting calculators: `tests/test_tools.py`
+- Integration-style fetch agent + tool wiring tests: `tests/test_fetch_agent.py`
+- RAG and retrieval behavior tests: `tests/test_rag.py`, `tests/test_retriever.py`,
+  `tests/test_vectorstore.py`

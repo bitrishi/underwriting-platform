@@ -1,7 +1,22 @@
 from langchain_core.tools import tool
 
 from src.rag.rag_chain import format_docs
-from src.rag.vectorstore import load_vectorstore
+from src.rag.vectorstore import build_vectorstore, load_vectorstore
+
+
+def _search_with_rebuild_on_mismatch(
+    query: str,
+    metadata_filter=None,
+    k: int = 3,
+):
+    """Run similarity search and rebuild store if FAISS dimensionality is stale."""
+    vectorstore = load_vectorstore()
+    try:
+        return vectorstore.similarity_search(query, k=k, filter=metadata_filter)
+    except AssertionError:
+        # Rebuild when persisted index dimensions do not match current embedding model.
+        rebuilt = build_vectorstore("data/policies")
+        return rebuilt.similarity_search(query, k=k, filter=metadata_filter)
 
 @tool
 def search_lending_policies(
@@ -23,8 +38,6 @@ def search_lending_policies(
     Returns:
         Relevant policy text with source citations
     """
-    vectorstore = load_vectorstore()
-
     source_keywords: list[str] = []
 
     jurisdiction_key = jurisdiction.lower().strip()
@@ -47,7 +60,11 @@ def search_lending_policies(
             keyword in str(m.get("source", "")).lower() for keyword in source_keywords
         )
 
-    results = vectorstore.similarity_search(enriched_query, k=3, filter=metadata_filter)
+    results = _search_with_rebuild_on_mismatch(
+        enriched_query,
+        metadata_filter=metadata_filter,
+        k=3,
+    )
     return format_docs(results)
 
 
@@ -81,6 +98,9 @@ def search_compliance_rules(query: str, regulation_type: str) -> str:
             keyword in str(m.get("source", "")).lower() for keyword in keywords
         )
 
-    vectorstore = load_vectorstore()
-    results = vectorstore.similarity_search(query, k=3, filter=metadata_filter)
+    results = _search_with_rebuild_on_mismatch(
+        query,
+        metadata_filter=metadata_filter,
+        k=3,
+    )
     return format_docs(results)
