@@ -1,0 +1,26 @@
+TEXAS HOME EQUITY LENDING REGULATIONS
+Texas Constitution Article XVI, Section 50(a)(6)
+Texas Finance Code, Chapter 342 and Chapter 343
+Effective: November 7, 2017 (Last Constitutional Amendment)
+
+TEXAS HOME EQUITY LOAN — 80% LTV RESTRICTION
+
+Maximum LTV for Home Equity Loans: Under Article XVI, Section 50(a)(6) of the Texas Constitution, a home equity loan (also called a Texas 50(a)(6) loan) may not exceed 80% of the fair market value of the homestead at the time the loan is made. This constitutional limit applies to the total debt secured by the homestead, including the proposed home equity loan plus any existing liens. Unlike conventional lending guidelines which calculate LTV based on purchase price or appraised value, the Texas constitutional limit is based solely on the fair market value as determined by a licensed appraiser. A borrower with a homestead appraised at $400,000 may not have combined outstanding mortgage debt exceeding $320,000.
+
+One-Loan-at-a-Time Restriction: Texas law prohibits a borrower from having more than one Texas 50(a)(6) home equity loan outstanding at any time against their homestead. A borrower may not obtain a new home equity loan until the existing home equity loan is paid in full and the lien is formally released of record. This restriction does not apply to first-lien mortgages used for purchase or rate-and-term refinances; it applies specifically to equity extraction transactions.
+
+CLOSING COST CAPS AND FEE RESTRICTIONS
+
+Three Percent Closing Cost Cap: Total fees charged in connection with a Texas home equity loan may not exceed 3% of the original principal amount of the loan. This fee cap is strictly applied and includes all fees charged by the lender and third parties, including origination fees, appraisal fees, title insurance, attorney fees, and any other charges paid by the borrower in connection with the transaction. Prepaid items such as escrow reserves for taxes and insurance, prepaid interest, and homeowner's insurance premiums are excluded from the 3% cap calculation. If the loan amount is small, the lender bears the risk of incurring out-of-pocket costs that push aggregate fees above the cap.
+
+Prohibited Fee Types: Texas law prohibits the following charges in connection with a home equity loan: fees for preparing the loan documents (document preparation fees charged separately from origination), fees for attending the closing, and any fee that is not a bona fide and reasonable fee for a service actually rendered. Lenders may not require the borrower to pay points in excess of amounts needed to achieve market rate pricing. Discount points paid voluntarily by the borrower to reduce the interest rate are permissible provided they are documented and disclosed as such.
+
+MANDATORY WAITING PERIODS AND BORROWER RIGHTS
+
+Twelve-Day Waiting Period: A Texas home equity loan may not close until at least 12 calendar days after the later of (a) the date the borrower submits a completed application, or (b) the date the lender provides the required home equity disclosures. The 12-day waiting period is a constitutional requirement and cannot be waived by the borrower. The closing may not be scheduled earlier than the 13th calendar day following the triggering event. Lenders must document the date disclosures were provided and maintain evidence of the waiting period in the loan file.
+
+Right of Rescission and Three-Day Cancellation: In addition to the federal TILA right of rescission, Texas home equity loans include a separate state-mandated right of rescission. The borrower has three calendar days after closing to rescind the transaction without penalty. The lender may not disburse loan proceeds until the three-day rescission period has expired and no notice of rescission has been received. The rescission right must be disclosed in writing at closing using the Texas-required form, and the acknowledgment of receipt must be signed by all borrowers and non-borrowing spouses.
+
+HOMESTEAD PROTECTIONS AND LENDER REMEDIES
+
+Homestead Protection Restrictions: Texas has some of the strongest homestead protections in the United States. A lender holding a Texas 50(a)(6) home equity loan may not accelerate the loan or foreclose except for failure to pay, failure to maintain required insurance, failure to pay taxes, waste committed by the owner, or other grounds expressly authorized by the Texas Constitution. The homestead protection applies to the entire primary residence and up to 10 acres of urban homestead or up to 100 acres of rural homestead for a single person (200 acres for a family). Lenders must obtain a court order to foreclose on a Texas homestead, as non-judicial foreclosure is not available for home equity loans.
