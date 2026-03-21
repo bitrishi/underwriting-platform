@@ -8,6 +8,7 @@ from langchain_core.prompts import ChatPromptTemplate
 
 from src.config.bedrock import create_llm
 from src.models.decision import LoanDecision
+from src.models.application import LoanApplication
 from src.utils.prompt_loader import load_prompt
 
 
@@ -87,3 +88,30 @@ def create_default_underwriter_chain():
 
 # For easy importing and usage
 underwriter_chain_v2 = create_default_underwriter_chain()
+
+
+def create_model_input_chain():
+    """Create a chain that accepts LoanApplication model directly.
+
+    This chain takes a LoanApplication Pydantic model as input,
+    automatically converts it to the required prompt format,
+    and returns a LoanDecision.
+
+    Returns:
+        RunnableLambda chain that transforms LoanApplication -> LoanDecision
+    """
+    from langchain_core.runnables import RunnableLambda
+
+    def transform_application(app: LoanApplication) -> LoanDecision:
+        """Transform LoanApplication to LoanDecision using the LCEL chain."""
+        # Convert the model to prompt string
+        application_data = app.to_prompt_string()
+
+        # Use the existing chain
+        return underwriter_chain_v2(application_data)
+
+    return RunnableLambda(transform_application)
+
+
+# Create the model-input chain
+underwriter_chain_v3 = create_model_input_chain()

@@ -1,0 +1,41 @@
+FANNIE MAE UNDERWRITING GUIDELINES
+Effective Date: January 2024
+Source: Selling Guide B3-1 through B3-6
+
+DEBT-TO-INCOME (DTI) REQUIREMENTS
+
+Maximum DTI Ratio: The maximum allowable debt-to-income ratio for manually underwritten loans is 45%. For loans receiving Desktop Underwriter (DU) Approve/Eligible recommendations, the maximum DTI may be approved up to 50% provided the borrower meets compensating factor requirements, including significant liquid reserves, low LTV ratio, or a history of managing similar payment levels.
+
+DTI Calculation Standards: The DTI ratio is calculated by dividing total monthly debt obligations by gross monthly income. Total monthly obligations include the proposed housing payment (principal, interest, taxes, insurance, HOA dues, and any applicable mortgage insurance premium), plus all recurring monthly debts such as installment loans, revolving accounts, student loans, auto loans, and any alimony or child support obligations. Debts with fewer than 10 remaining payments may be excluded at the lender's discretion.
+
+Student Loan DTI Treatment: For student loans in deferment, income-based repayment, or forbearance, the lender must use the greater of 1% of the outstanding loan balance or the actual documented payment amount when calculating DTI. If the borrower provides written documentation of the fully amortizing monthly payment that will apply upon expiration of the deferment period, that payment amount may be used.
+
+FICO CREDIT SCORE REQUIREMENTS
+
+Minimum Credit Score — Standard Loans: The minimum representative credit score for a conventional conforming loan is 620. When multiple borrowers are on the loan, the representative score is determined by taking the lowest middle score among all borrowers. If a borrower has fewer than three scores, the lender must use the lower of the two available scores.
+
+Minimum Credit Score — High-Balance and Jumbo: Loans with loan amounts exceeding conforming limits require a minimum representative credit score of 680. These loans are subject to additional scrutiny including documentation of assets and income sources, and may require compensating factors if the credit profile shows any derogatory history within the past 24 months.
+
+Credit Score and Rate Adjustments: Loan-level price adjustments (LLPAs) are applied based on the representative credit score in combination with LTV ratio. Borrowers with scores below 680 on loans with LTV above 75% will face significant pricing adjustments. Borrowers with scores of 740 or above receive the most favorable pricing tiers.
+
+LOAN-TO-VALUE (LTV) REQUIREMENTS
+
+Maximum LTV by Occupancy and Product: For primary residence purchase transactions, the maximum LTV is 97% for fixed-rate loans under the HomeReady and standard conventional programs. For second homes, the maximum LTV is 90%. For investment properties, the maximum LTV is 85% for single-family and 75% for 2-4 unit properties. Cash-out refinance transactions are subject to lower LTV limits: 80% for primary residences and 75% for second homes.
+
+LTV and Property Type Restrictions: Condominiums in projects that do not meet Fannie Mae project approval guidelines are limited to a maximum LTV of 75%. Manufactured homes are limited to 95% LTV for purchase transactions and 90% for rate-and-term refinances. Co-op units follow the same LTV limits as condominiums but are subject to additional project review requirements.
+
+PRIVATE MORTGAGE INSURANCE (PMI)
+
+PMI Requirement Threshold: Private mortgage insurance is required on all conventional loans with an LTV ratio exceeding 80%. The PMI requirement applies to the original loan amount and cannot be waived based on a projected future value or anticipated appreciation. Lender-paid mortgage insurance (LPMI) is permitted but must be disclosed per TRID requirements and results in a higher note rate.
+
+PMI Cancellation Rights: Per the Homeowners Protection Act (HPA), borrowers have the right to request PMI cancellation when the loan balance reaches 80% of the original purchase price or appraised value (whichever is lower) based on the original amortization schedule. PMI must be automatically terminated when the loan balance reaches 78% of the original value based on scheduled payments. Borrowers may request early cancellation if they can demonstrate through a new appraisal that the LTV has reached 80% due to appreciation or improvements, provided the loan has been seasoned for at least 24 months.
+
+EMPLOYMENT AND INCOME REQUIREMENTS
+
+Employment History Requirements: Borrowers must demonstrate a two-year history of employment and income. The two-year history does not need to be with the same employer, but gaps in employment exceeding 30 days must be explained in writing. Recent graduates entering their field of study are exempt from the two-year history requirement if they can document a job offer or placement in the field for which they were trained.
+
+Self-Employment Income: Self-employed borrowers must provide two years of signed federal tax returns including all schedules. Income is calculated using a 24-month average of net income after adding back non-cash expenses such as depreciation, depletion, and amortization. If the most recent year's income is significantly lower (more than 25%) than the prior year, the lower year's income must be used unless the borrower can document a non-recurring loss or a structural change in the business.
+
+Variable Income Verification: Bonus, overtime, and commission income may be included if the borrower has received this income for a minimum of two years. The lender must verify the income using the lesser of the 24-month average or the most recent 12-month average. If the income has declined in the most recent year, a written explanation from the employer confirming continuation of the income is required. Part-time income from a secondary employer is eligible if the borrower has held the secondary position for at least two years.
+
+Asset and Reserve Requirements: Borrowers must document sufficient assets to cover the down payment, closing costs, and any required reserves. Reserves are measured in months of the proposed housing payment (PITIA). Investment properties require a minimum of 6 months reserves. Primary residences with LTV above 90% require 2 months reserves. All funds used for closing must be sourced and seasoned for a minimum of 60 days in a verified financial account.

@@ -1,0 +1,21 @@
+TILA-RESPA INTEGRATED DISCLOSURE (TRID) REGULATIONS
+Regulation Z — 12 CFR Part 1026
+Effective: October 3, 2015 | Amended: October 3, 2018 (TRID 2.0)
+
+LOAN ESTIMATE DELIVERY REQUIREMENTS
+
+Loan Estimate Timing: The lender must provide the Loan Estimate (LE) to the applicant no later than three business days after receiving a completed loan application. A completed application is defined as the receipt of six key pieces of information: the consumer's name, income, Social Security number, property address, estimated property value, and the loan amount sought. The LE must be delivered or placed in the mail no later than the third business day after receiving the application, and the applicant is presumed to have received it three business days after it is mailed.
+
+Loan Estimate Content Requirements: The Loan Estimate must include the loan terms (loan amount, interest rate, monthly principal and interest payment, prepayment penalty disclosure, and balloon payment disclosure if applicable), projected payments broken down by principal, interest, mortgage insurance, and estimated escrow, a summary of closing costs itemized into origination charges and other costs, and cash to close calculations. The lender must also include comparisons showing APR, total interest percentage (TIP), and in-5-years calculations. The form must use the standardized H-24 format prescribed by the CFPB.
+
+CLOSING DISCLOSURE REQUIREMENTS
+
+Closing Disclosure Timing: The lender must ensure the borrower receives the Closing Disclosure (CD) no later than three business days before consummation of the loan. For purposes of this timing requirement, business days include all calendar days except Sundays and federal public holidays. If the CD is mailed, an additional three business days must be added to account for delivery, effectively requiring the CD to be sent six business days before closing. Electronic delivery with documented consumer consent may satisfy the delivery requirement on the date of transmission.
+
+Three-Day Waiting Period Triggers — Revised Closing Disclosure: A new three-business-day waiting period is required if, after the initial CD is delivered, any of the following changes occur: (1) the APR increases by more than 1/8 of a percentage point for fixed-rate loans or 1/4 of a percentage point for variable-rate loans; (2) the loan product changes (e.g., fixed to adjustable); or (3) a prepayment penalty is added. Changes to other loan terms, including closing costs, do not trigger a new waiting period but must be reflected on a revised CD provided at or before closing.
+
+TOLERANCE CATEGORIES AND CURE PROVISIONS
+
+Fee Tolerance Categories: TRID establishes three categories of fee tolerance. Zero-tolerance items include origination charges, transfer taxes, and fees for required third-party services where the lender selected the provider — these may not increase from the LE to the CD. Ten-percent aggregate tolerance items include recording fees and charges for required third-party services where the consumer selected from the lender's written provider list — the aggregate of these charges may not increase by more than 10%. Unlimited-tolerance items include prepaid interest, property insurance premiums, escrow reserves, and fees for third-party services the consumer selected outside the lender's list.
+
+Cure Provisions: If a tolerance violation is discovered at or after settlement, the lender must cure the violation by refunding the excess amount to the borrower no later than the third business day after settlement. The refund must be documented and disclosed on a revised Closing Disclosure. Lenders must maintain a compliance management system to identify tolerance violations prior to closing, as post-closing cures carry reputational and regulatory risk. Regulatory examination findings of systemic TRID violations may result in civil money penalties under TILA, with individual violation penalties of up to $5,000 per day for non-intentional violations.
