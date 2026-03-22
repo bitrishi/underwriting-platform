@@ -1,0 +1,7 @@
+W-2 Wage and Tax Statement
+Tax Year: 2024
+Employer Name: Acme Lending Services
+Employee Name: Jane Borrower
+Wages: 86500.00
+Federal Tax Withheld: 13240.00
+Social Security Wages: 86500.00

@@ -64,6 +64,59 @@ outputs that agents can reason over.
   - Uses regulation aliases to narrow retrieval focus
   - Returns formatted citations from matching policy/compliance docs
 
+## Knowledge Graph Tools
+
+### Overview
+
+Graph tools expose relationship-aware context that retrieval alone cannot produce.
+The backing graph schema links:
+
+- `Borrower -> WORKS_AT -> Company -> IN_INDUSTRY -> Industry`
+- `Borrower -> HAS_LOAN -> Loan -> SECURED_BY -> Property -> LOCATED_IN -> State`
+- `State -> GOVERNED_BY -> Regulation`
+
+### `get_borrower_risk_context`
+
+- Input: `ssn_last4`
+- Output:
+  - borrower profile
+  - employer and industry risk metadata
+  - prior loans and default ratio
+  - related properties, states, and regulations
+
+Use case:
+- Explain borrower risk with a full entity traversal (not just text matches).
+
+### `find_similar_past_loans`
+
+- Inputs: `industry`, optional `min_fico`, optional `limit`
+- Output:
+  - matching historical loans
+  - outcomes summary (`approved`, `defaulted`, `default_ratio`)
+
+Use case:
+- Compare current application to historical outcomes in the same industry.
+
+### `get_state_regulations`
+
+- Input: `state`
+- Output:
+  - state-specific and federal regulations attached to that state node
+
+Use case:
+- Inject jurisdiction-aware rules into compliance and decisioning prompts.
+
+### Cross-Validation Guidance
+
+When using graph tools with document review outputs:
+
+1. Pull borrower risk context by SSN.
+2. Compare extracted employment data to graph employer/industry.
+3. Compare industry default rate to model confidence/risk tier.
+4. Fetch state regulations and cross-check policy constraints.
+
+This creates a multi-source risk picture combining document, graph, and policy data.
+
 ## Design Rules
 
 - Keep each tool focused on one responsibility.

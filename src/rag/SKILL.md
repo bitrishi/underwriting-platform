@@ -270,3 +270,31 @@ Likely next enhancements for this RAG layer:
 - support incremental refresh instead of rebuilding the full FAISS index
 - add document normalization and metadata enrichment during ingestion
 - expose score diagnostics to help tune hybrid weighting and threshold values
+
+## Query Strategy (Priority Order)
+
+1. **Deterministic templates** — `COMPLIANCE_QUERIES` in `query_templates.py`
+   Best for known topics. Most reliable. No LLM call.
+
+2. **Synonym expansion** — `TERM_SYNONYMS` in `query_templates.py`
+   For unknown topics. Catches terminology mismatches. No LLM call.
+
+3. **LLM rewriting** — NOT USED in production.
+   Unreliable (doesn't know our docs). Reserved for future chatbot interface.
+
+## Multi-Model Strategy
+
+| Task | Model | Reason |
+|------|-------|--------|
+| Routine RAG | Haiku | Cheap, fast, good enough |
+| Critical RAG | Sonnet | Strongest reasoning for legal text |
+| Retrieval grading | Haiku | Simple yes/no task |
+| Hallucination check | Haiku | Verification task |
+
+## Cost Analysis
+
+| Mode | LLM Calls | Cost/Query | Use When |
+|------|-----------|-----------|----------|
+| Routine | 1 (Haiku) | ~$0.001 | General policy lookups |
+| Critical | 1 (Sonnet) | ~$0.003 | Regulatory compliance |
+| Critical + verify | 2 (Sonnet + Haiku) | ~$0.005 | When self-check flags issues |

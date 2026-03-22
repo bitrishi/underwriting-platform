@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Graph DB Internals — Underwriting Knowledge Graph</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f1419; color: #e7e9ea; }
+  
+  .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+  
+  h1 { font-size: 28px; color: #fff; margin-bottom: 8px; }
+  h2 { font-size: 20px; color: #71b7ff; margin: 30px 0 12px; }
+  .subtitle { color: #8b98a5; font-size: 14px; margin-bottom: 30px; }
+  
+  .tabs { display: flex; gap: 4px; margin-bottom: 20px; flex-wrap: wrap; }
+  .tab { padding: 10px 20px; background: #1e2732; border: 1px solid #38444d; border-radius: 8px; cursor: pointer; color: #8b98a5; font-size: 13px; font-weight: 600; transition: all 0.2s; }
+  .tab:hover { background: #253341; color: #e7e9ea; }
+  .tab.active { background: #1d4ed8; border-color: #1d4ed8; color: #fff; }
+  
+  .panel { display: none; }
+  .panel.active { display: block; }
+  
+  /* Graph Canvas */
+  .graph-container { background: #1a2332; border-radius: 12px; padding: 20px; border: 1px solid #2d3d50; margin-bottom: 20px; }
+  
+  svg { width: 100%; height: auto; }
+  
+  .node-circle { cursor: pointer; transition: all 0.3s; }
+  .node-circle:hover { filter: brightness(1.3); }
+  
+  .node-label { font-size: 11px; fill: #fff; font-weight: 600; text-anchor: middle; pointer-events: none; }
+  .node-sublabel { font-size: 9px; fill: #8b98a5; text-anchor: middle; pointer-events: none; }
+  
+  .edge-line { stroke-width: 2; fill: none; }
+  .edge-label { font-size: 9px; fill: #71b7ff; text-anchor: middle; font-weight: 600; }
+  
+  .arrow-head { fill: #71b7ff; }
+  
+  /* Info panels */
+  .info-box { background: #1e2732; border-radius: 10px; padding: 16px 20px; margin-bottom: 16px; border-left: 3px solid #1d4ed8; }
+  .info-box.green { border-left-color: #22c55e; }
+  .info-box.orange { border-left-color: #f97316; }
+  .info-box.purple { border-left-color: #a855f7; }
+  .info-box.red { border-left-color: #ef4444; }
+  .info-title { font-size: 14px; font-weight: 700; color: #71b7ff; margin-bottom: 6px; }
+  .info-box.green .info-title { color: #22c55e; }
+  .info-box.orange .info-title { color: #f97316; }
+  .info-box.purple .info-title { color: #a855f7; }
+  .info-box.red .info-title { color: #ef4444; }
+  .info-text { font-size: 13px; color: #b0bec5; line-height: 1.6; }
+  .info-text code { background: #2d3d50; padding: 2px 6px; border-radius: 4px; color: #71b7ff; font-size: 12px; }
+  
+  /* Storage diagram */
+  .storage-row { display: flex; gap: 12px; margin-bottom: 12px; align-items: stretch; flex-wrap: wrap; }
+  .storage-block { background: #1e2732; border-radius: 8px; padding: 14px; border: 1px solid #38444d; flex: 1; min-width: 200px; }
+  .storage-block.highlight { border-color: #1d4ed8; background: #1a2744; }
+  .storage-header { font-size: 11px; font-weight: 700; color: #f97316; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+  .storage-content { font-family: 'Courier New', monospace; font-size: 11px; color: #8b98a5; line-height: 1.8; }
+  .storage-content .ptr { color: #22c55e; }
+  .storage-content .val { color: #71b7ff; }
+  .storage-content .key { color: #f97316; }
+  
+  /* Comparison table */
+  .compare-table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+  .compare-table th { background: #1d4ed8; color: #fff; padding: 10px 14px; text-align: left; font-size: 12px; font-weight: 600; }
+  .compare-table td { padding: 10px 14px; font-size: 12px; border-bottom: 1px solid #2d3d50; color: #b0bec5; }
+  .compare-table tr:nth-child(even) td { background: #1a2332; }
+  
+  /* Traversal animation */
+  .traversal-step { display: flex; align-items: center; gap: 12px; padding: 10px 16px; background: #1e2732; border-radius: 8px; margin-bottom: 8px; border: 1px solid #38444d; transition: all 0.3s; }
+  .traversal-step.active { border-color: #22c55e; background: #1a2e1a; }
+  .traversal-step.done { border-color: #38444d; opacity: 0.6; }
+  .step-num { width: 28px; height: 28px; background: #2d3d50; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: #71b7ff; flex-shrink: 0; }
+  .traversal-step.active .step-num { background: #22c55e; color: #fff; }
+  .step-text { font-size: 12px; color: #b0bec5; }
+  .step-text strong { color: #e7e9ea; }
+  .step-cost { margin-left: auto; font-size: 11px; color: #8b98a5; font-family: monospace; flex-shrink: 0; }
+  
+  .btn { padding: 10px 20px; background: #1d4ed8; color: #fff; border: none; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 600; transition: background 0.2s; }
+  .btn:hover { background: #2563eb; }
+  .btn:disabled { background: #38444d; cursor: not-allowed; }
+  
+  .legend { display: flex; gap: 16px; flex-wrap: wrap; margin: 12px 0; }
+  .legend-item { display: flex; align-items: center; gap: 6px; font-size: 11px; color: #8b98a5; }
+  .legend-dot { width: 12px; height: 12px; border-radius: 50%; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>Graph Database Internals</h1>
+  <p class="subtitle">How Neo4j stores data, indexes, and traverses relationships — with underwriting examples</p>
+  
+  <div class="tabs">
+    <div class="tab active" onclick="showTab('graph')">Knowledge Graph</div>
+    <div class="tab" onclick="showTab('storage')">Storage Internals</div>
+    <div class="tab" onclick="showTab('traversal')">Traversal: Graph vs SQL</div>
+    <div class="tab" onclick="showTab('relationships')">One-to-Many / Cyclic</div>
+    <div class="tab" onclick="showTab('compare')">When to Use What</div>
+  </div>
+
+  <!-- TAB 1: Knowledge Graph -->
+  <div id="graph" class="panel active">
+    <h2>Underwriting Knowledge Graph</h2>
+    <p style="color:#8b98a5;font-size:13px;margin-bottom:16px">Click any node to see its properties and connections</p>
+    
+    <div class="graph-container">
+      <svg viewBox="0 0 900 520" id="graphSvg">
+        <defs>
+          <marker id="arrowBlue" viewBox="0 0 10 7" refX="10" refY="3.5" markerWidth="8" markerHeight="6" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#4a90d9"/></marker>
+          <marker id="arrowGreen" viewBox="0 0 10 7" refX="10" refY="3.5" markerWidth="8" markerHeight="6" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#22c55e"/></marker>
+        </defs>
+        
+        <!-- Edges -->
+        <line x1="180" y1="120" x2="370" y2="120" stroke="#4a90d9" stroke-width="2" marker-end="url(#arrowBlue)"/>
+        <text x="275" y="108" class="edge-label">WORKS_AT</text>
+        
+        <line x1="500" y1="120" x2="680" y2="120" stroke="#4a90d9" stroke-width="2" marker-end="url(#arrowBlue)"/>
+        <text x="590" y="108" class="edge-label">IN_INDUSTRY</text>
+        
+        <line x1="120" y1="175" x2="120" y2="265" stroke="#22c55e" stroke-width="2" marker-end="url(#arrowGreen)"/>
+        <text x="80" y="225" class="edge-label" fill="#22c55e">APPLIED_FOR</text>
+        
+        <line x1="180" y1="300" x2="370" y2="300" stroke="#22c55e" stroke-width="2" marker-end="url(#arrowGreen)"/>
+        <text x="275" y="288" class="edge-label" fill="#22c55e">SECURED_BY</text>
+        
+        <line x1="440" y1="355" x2="440" y2="430" stroke="#4a90d9" stroke-width="2" marker-end="url(#arrowBlue)"/>
+        <text x="485" y="400" class="edge-label">LOCATED_IN</text>
+        
+        <line x1="500" y1="465" x2="680" y2="465" stroke="#f97316" stroke-width="2" marker-end="url(#arrowBlue)"/>
+        <text x="590" y="453" class="edge-label" style="fill:#f97316">GOVERNED_BY</text>
+        
+        <line x1="750" y1="175" x2="750" y2="380" stroke="#a855f7" stroke-width="2" stroke-dasharray="6,3"/>
+        <text x="790" y="280" class="edge-label" style="fill:#a855f7">HAS_RISK</text>
+        
+        <!-- Second borrower -->
+        <line x1="180" y1="200" x2="370" y2="155" stroke="#4a90d9" stroke-width="1.5" marker-end="url(#arrowBlue)" opacity="0.5"/>
+        <text x="265" y="170" class="edge-label" style="opacity:0.6">WORKS_AT</text>
+        
+        <!-- Nodes -->
+        <!-- John -->
+        <circle cx="120" cy="120" r="52" fill="#1d4ed8" class="node-circle" onclick="showNodeInfo('john')"/>
+        <text x="120" y="116" class="node-label">John Doe</text>
+        <text x="120" y="132" class="node-sublabel">Borrower · FICO 740</text>
+        
+        <!-- Jane -->
+        <circle cx="120" cy="200" r="35" fill="#1d4ed8" opacity="0.6" class="node-circle" onclick="showNodeInfo('jane')"/>
+        <text x="120" y="197" class="node-label" style="font-size:9px">Jane Smith</text>
+        <text x="120" y="210" class="node-sublabel" style="font-size:8px">FICO 680</text>
+        
+        <!-- TechCorp -->
+        <circle cx="440" cy="120" r="52" fill="#0d9488" class="node-circle" onclick="showNodeInfo('techcorp')"/>
+        <text x="440" y="116" class="node-label">TechCorp</text>
+        <text x="440" y="132" class="node-sublabel">Company · Est 2015</text>
+        
+        <!-- Technology -->
+        <circle cx="740" cy="120" r="52" fill="#7c3aed" class="node-circle" onclick="showNodeInfo('tech_industry')"/>
+        <text x="740" y="116" class="node-label">Technology</text>
+        <text x="740" y="132" class="node-sublabel">Industry</text>
+        
+        <!-- Loan -->
+        <circle cx="120" cy="300" r="48" fill="#22c55e" class="node-circle" onclick="showNodeInfo('loan')"/>
+        <text x="120" y="296" class="node-label">APP-001</text>
+        <text x="120" y="312" class="node-sublabel">Loan · $350K</text>
+        
+        <!-- Property -->
+        <circle cx="440" cy="300" r="52" fill="#f97316" class="node-circle" onclick="showNodeInfo('property')"/>
+        <text x="440" y="296" class="node-label">123 Main St</text>
+        <text x="440" y="312" class="node-sublabel">Property · $440K</text>
+        
+        <!-- Texas -->
+        <circle cx="440" cy="465" r="42" fill="#ef4444" class="node-circle" onclick="showNodeInfo('texas')"/>
+        <text x="440" y="462" class="node-label">Texas</text>
+        <text x="440" y="476" class="node-sublabel">State</text>
+        
+        <!-- Regulation -->
+        <circle cx="740" cy="465" r="52" fill="#ef4444" opacity="0.8" class="node-circle" onclick="showNodeInfo('regulation')"/>
+        <text x="740" y="458" class="node-label" style="font-size:10px">Section 50(a)(6)</text>
+        <text x="740" y="474" class="node-sublabel">Regulation</text>
+        
+        <!-- Risk Profile -->
+        <circle cx="740" cy="410" r="32" fill="#a855f7" opacity="0.7" class="node-circle" onclick="showNodeInfo('risk')"/>
+        <text x="740" y="407" class="node-label" style="font-size:9px">3.2% default</text>
+        <text x="740" y="420" class="node-sublabel" style="font-size:8px">Risk Profile</text>
+      </svg>
+    </div>
+    
+    <div class="legend">
+      <div class="legend-item"><div class="legend-dot" style="background:#1d4ed8"></div>Borrower</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#0d9488"></div>Company</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#7c3aed"></div>Industry</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#22c55e"></div>Loan</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#f97316"></div>Property</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#ef4444"></div>State / Regulation</div>
+    </div>
+    
+    <div id="nodeInfo">
+      <div class="info-box">
+        <div class="info-title">Click any node to explore</div>
+        <div class="info-text">Each node stores its own properties and direct pointers to its relationships. No index lookup needed for traversal — just follow the pointers.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 2: Storage Internals -->
+  <div id="storage" class="panel">
+    <h2>How Neo4j Stores Data Physically</h2>
+    
+    <div class="info-box green">
+      <div class="info-title">Key Concept: Index-Free Adjacency</div>
+      <div class="info-text">Each node has a <strong>direct physical pointer</strong> to its relationships. Each relationship has pointers to its start/end nodes AND the next relationship. Traversal = following pointers. No index scan needed after finding the starting node.</div>
+    </div>
+    
+    <h2>Node Record (fixed 15 bytes)</h2>
+    <div class="storage-row">
+      <div class="storage-block highlight">
+        <div class="storage-header">Node: John Doe (ID: 4200)</div>
+        <div class="storage-content">
+          <span class="key">in_use:</span> <span class="val">true</span><br>
+          <span class="key">first_rel:</span> <span class="ptr">→ REL#8100</span><br>
+          <span class="key">first_prop:</span> <span class="ptr">→ PROP#AA00</span><br>
+          <span class="key">labels:</span> <span class="val">[:Borrower]</span><br>
+          <br>
+          <span style="color:#555">// Position = 4200 × 15 = byte 63000</span><br>
+          <span style="color:#555">// Finding this node: instant (just math)</span>
+        </div>
+      </div>
+      <div class="storage-block">
+        <div class="storage-header">Node: TechCorp (ID: 6044)</div>
+        <div class="storage-content">
+          <span class="key">in_use:</span> <span class="val">true</span><br>
+          <span class="key">first_rel:</span> <span class="ptr">→ REL#8100</span><br>
+          <span class="key">first_prop:</span> <span class="ptr">→ PROP#BB00</span><br>
+          <span class="key">labels:</span> <span class="val">[:Company]</span>
+        </div>
+      </div>
+    </div>
+    
+    <h2>Relationship Record (fixed 34 bytes)</h2>
+    <div class="storage-row">
+      <div class="storage-block highlight">
+        <div class="storage-header">Relationship: WORKS_AT (ID: 8100)</div>
+        <div class="storage-content">
+          <span class="key">start_node:</span> <span class="ptr">→ NODE#4200</span> (John)<br>
+          <span class="key">end_node:</span> <span class="ptr">→ NODE#6044</span> (TechCorp)<br>
+          <span class="key">type:</span> <span class="val">WORKS_AT</span><br>
+          <span class="key">start_next_rel:</span> <span class="ptr">→ REL#8200</span> (John's next rel)<br>
+          <span class="key">start_prev_rel:</span> <span class="val">NULL</span><br>
+          <span class="key">end_next_rel:</span> <span class="ptr">→ REL#8150</span> (TechCorp's next rel)<br>
+          <span class="key">end_prev_rel:</span> <span class="val">NULL</span><br>
+          <span class="key">first_prop:</span> <span class="ptr">→ PROP#CC00</span> ({since: 2019})
+        </div>
+      </div>
+    </div>
+    
+    <div class="info-box orange">
+      <div class="info-title">Doubly-Linked List of Relationships</div>
+      <div class="info-text">
+        Each relationship has <code>start_next_rel</code> and <code>end_next_rel</code> pointers. This forms a doubly-linked list around EACH node.
+        <br><br>
+        <strong>John's relationships:</strong> WORKS_AT → APPLIED_FOR → FRIENDS_WITH → NULL<br>
+        <strong>TechCorp's relationships:</strong> WORKS_AT(John) → WORKS_AT(Jane) → IN_INDUSTRY → NULL<br>
+        <br>
+        Finding ALL of John's relationships: follow the chain. O(k) where k = number of John's relationships. <strong>NOT affected by total database size.</strong>
+      </div>
+    </div>
+    
+    <h2>Property Records (linked list per node)</h2>
+    <div class="storage-row">
+      <div class="storage-block">
+        <div class="storage-header">PROP#AA00 (John's first prop)</div>
+        <div class="storage-content">
+          <span class="key">key:</span> <span class="val">"name"</span><br>
+          <span class="key">value:</span> <span class="val">"John Doe"</span><br>
+          <span class="key">next:</span> <span class="ptr">→ PROP#AA20</span>
+        </div>
+      </div>
+      <div class="storage-block">
+        <div class="storage-header">PROP#AA20</div>
+        <div class="storage-content">
+          <span class="key">key:</span> <span class="val">"fico"</span><br>
+          <span class="key">value:</span> <span class="val">740</span><br>
+          <span class="key">next:</span> <span class="ptr">→ PROP#AA40</span>
+        </div>
+      </div>
+      <div class="storage-block">
+        <div class="storage-header">PROP#AA40</div>
+        <div class="storage-content">
+          <span class="key">key:</span> <span class="val">"income"</span><br>
+          <span class="key">value:</span> <span class="val">120000</span><br>
+          <span class="key">next:</span> <span class="val">NULL</span>
+        </div>
+      </div>
+    </div>
+    
+    <h2>Indexes in Neo4j</h2>
+    <div class="info-box purple">
+      <div class="info-title">Indexes: Only for Finding the Starting Node</div>
+      <div class="info-text">
+        <strong>MySQL:</strong> Indexes needed for EVERY query. Without index → full table scan.<br>
+        <strong>Neo4j:</strong> Index needed ONLY to find the entry point. After that, traversal is index-free.<br><br>
+        <code>CREATE INDEX FOR (b:Borrower) ON (b.ssn_last4)</code><br><br>
+        Step 1: Find John via index → <strong>needs index</strong> (B-tree lookup)<br>
+        Step 2: John → WORKS_AT → TechCorp → <strong>no index</strong> (follow pointer)<br>
+        Step 3: TechCorp → IN_INDUSTRY → Technology → <strong>no index</strong> (follow pointer)<br>
+        Step 4: Technology → HAS_RISK → {default_rate: 3.2%} → <strong>no index</strong> (follow pointer)
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 3: Traversal Comparison -->
+  <div id="traversal" class="panel">
+    <h2>Graph Traversal vs SQL JOIN</h2>
+    <p style="color:#8b98a5;font-size:13px;margin-bottom:16px">Query: "Find the industry default rate for John's employer"</p>
+    
+    <div style="display:flex;gap:20px;flex-wrap:wrap;">
+      <div style="flex:1;min-width:300px;">
+        <h2 style="color:#ef4444">MySQL Approach (Index Scans)</h2>
+        <div id="sqlSteps">
+          <div class="traversal-step" id="sql1">
+            <div class="step-num">1</div>
+            <div class="step-text">Scan <strong>persons index</strong> → find id=1 (John)</div>
+            <div class="step-cost">O(log n)</div>
+          </div>
+          <div class="traversal-step" id="sql2">
+            <div class="step-num">2</div>
+            <div class="step-text">Scan <strong>employment index</strong> → find person_id=1</div>
+            <div class="step-cost">O(log n)</div>
+          </div>
+          <div class="traversal-step" id="sql3">
+            <div class="step-num">3</div>
+            <div class="step-text">Read company_id=5 from row</div>
+            <div class="step-cost">O(1)</div>
+          </div>
+          <div class="traversal-step" id="sql4">
+            <div class="step-num">4</div>
+            <div class="step-text">Scan <strong>companies index</strong> → find id=5</div>
+            <div class="step-cost">O(log n)</div>
+          </div>
+          <div class="traversal-step" id="sql5">
+            <div class="step-num">5</div>
+            <div class="step-text">Scan <strong>company_industries index</strong> → find company_id=5</div>
+            <div class="step-cost">O(log n)</div>
+          </div>
+          <div class="traversal-step" id="sql6">
+            <div class="step-num">6</div>
+            <div class="step-text">Scan <strong>industries index</strong> → find id → read default_rate</div>
+            <div class="step-cost">O(log n)</div>
+          </div>
+        </div>
+        <div class="info-box red" style="margin-top:12px">
+          <div class="info-title">Total: 5 index scans</div>
+          <div class="info-text">Cost: O(5 × log n) — grows with table size<br>1M rows: ~100 comparisons per scan<br>With 8 JOINs on large tables: can take seconds</div>
+        </div>
+      </div>
+      
+      <div style="flex:1;min-width:300px;">
+        <h2 style="color:#22c55e">Neo4j Approach (Pointer Following)</h2>
+        <div id="graphSteps">
+          <div class="traversal-step" id="g1">
+            <div class="step-num">1</div>
+            <div class="step-text"><strong>Index lookup</strong>: find John by SSN</div>
+            <div class="step-cost">O(log n)</div>
+          </div>
+          <div class="traversal-step" id="g2">
+            <div class="step-num">2</div>
+            <div class="step-text">Follow <strong>pointer</strong> → WORKS_AT relationship</div>
+            <div class="step-cost" style="color:#22c55e">O(1)</div>
+          </div>
+          <div class="traversal-step" id="g3">
+            <div class="step-num">3</div>
+            <div class="step-text">Follow <strong>pointer</strong> → TechCorp node</div>
+            <div class="step-cost" style="color:#22c55e">O(1)</div>
+          </div>
+          <div class="traversal-step" id="g4">
+            <div class="step-num">4</div>
+            <div class="step-text">Follow <strong>pointer</strong> → IN_INDUSTRY relationship</div>
+            <div class="step-cost" style="color:#22c55e">O(1)</div>
+          </div>
+          <div class="traversal-step" id="g5">
+            <div class="step-num">5</div>
+            <div class="step-text">Follow <strong>pointer</strong> → Technology node → read default_rate</div>
+            <div class="step-cost" style="color:#22c55e">O(1)</div>
+          </div>
+        </div>
+        <div class="info-box green" style="margin-top:12px">
+          <div class="info-title">Total: 1 index scan + 4 pointer follows</div>
+          <div class="info-text">Cost: O(log n + 4) — only first step grows with size<br>1M nodes or 1B nodes: same traversal speed<br>Pointer follow = direct memory access = nanoseconds</div>
+        </div>
+      </div>
+    </div>
+    
+    <div style="margin-top:20px">
+      <button class="btn" onclick="animateTraversal()">▶ Animate Both Approaches</button>
+      <button class="btn" style="background:#38444d;margin-left:8px" onclick="resetTraversal()">Reset</button>
+    </div>
+  </div>
+
+  <!-- TAB 4: Relationship Types -->
+  <div id="relationships" class="panel">
+    <h2>Relationship Patterns</h2>
+    
+    <div class="info-box">
+      <div class="info-title">One-to-Many: Company → Employees</div>
+      <div class="info-text">
+        TechCorp has 3 employees. Each WORKS_AT relationship is a separate record in the relationship store. They form a linked list hanging off TechCorp's node.
+        <br><br>
+        <code>TechCorp.first_rel → rel1(John) → rel2(Jane) → rel3(Bob) → NULL</code>
+        <br><br>
+        Finding all employees: follow the chain. O(3) — constant per relationship, not affected by total DB size.
+      </div>
+    </div>
+    
+    <div class="graph-container" style="padding:10px">
+      <svg viewBox="0 0 700 200">
+        <circle cx="350" cy="60" r="40" fill="#0d9488"/>
+        <text x="350" y="57" class="node-label">TechCorp</text>
+        <text x="350" y="72" class="node-sublabel">Company</text>
+        
+        <line x1="310" y1="60" x2="140" y2="160" stroke="#4a90d9" stroke-width="1.5"/>
+        <line x1="350" y1="100" x2="350" y2="155" stroke="#4a90d9" stroke-width="1.5"/>
+        <line x1="390" y1="60" x2="560" y2="160" stroke="#4a90d9" stroke-width="1.5"/>
+        
+        <text x="210" y="105" class="edge-label" style="font-size:8px">WORKS_AT</text>
+        <text x="365" y="130" class="edge-label" style="font-size:8px">WORKS_AT</text>
+        <text x="480" y="105" class="edge-label" style="font-size:8px">WORKS_AT</text>
+        
+        <circle cx="120" cy="170" r="30" fill="#1d4ed8"/>
+        <text x="120" y="168" class="node-label" style="font-size:10px">John</text>
+        <text x="120" y="180" class="node-sublabel" style="font-size:8px">FICO 740</text>
+        
+        <circle cx="350" cy="170" r="30" fill="#1d4ed8"/>
+        <text x="350" y="168" class="node-label" style="font-size:10px">Jane</text>
+        <text x="350" y="180" class="node-sublabel" style="font-size:8px">FICO 680</text>
+        
+        <circle cx="580" cy="170" r="30" fill="#1d4ed8"/>
+        <text x="580" y="168" class="node-label" style="font-size:10px">Bob</text>
+        <text x="580" y="180" class="node-sublabel" style="font-size:8px">FICO 620</text>
+      </svg>
+    </div>
+    
+    <div class="info-box green">
+      <div class="info-title">Bidirectional: Stored Once, Traversed Both Ways</div>
+      <div class="info-text">
+        <code>(John) -[:WORKS_AT]→ (TechCorp)</code><br><br>
+        Stored as ONE relationship record with both <code>start_node</code> and <code>end_node</code> pointers.<br><br>
+        <strong>Forward:</strong> <code>MATCH (john)-[:WORKS_AT]->(company)</code> — follows start→end<br>
+        <strong>Backward:</strong> <code>MATCH (company)<-[:WORKS_AT]-(person)</code> — follows end→start<br>
+        <strong>Either:</strong> <code>MATCH (john)-[:WORKS_AT]-(x)</code> — no arrow = both directions<br><br>
+        One record, two traversal directions. No duplication needed.
+      </div>
+    </div>
+    
+    <div class="info-box purple">
+      <div class="info-title">Cyclic: Naturally Supported</div>
+      <div class="info-text">
+        <code>(Company A) -[:SUBSIDIARY_OF]→ (Company B) -[:SUBSIDIARY_OF]→ (Company C) -[:OWNS]→ (Company A)</code><br><br>
+        Each relationship is an independent record. Cycles are just more relationship records — no special handling needed.<br><br>
+        Cypher prevents infinite loops with path length limits:<br>
+        <code>MATCH path = (a)-[:SUBSIDIARY_OF*1..5]->(b)</code><br>
+        <code>*1..5</code> = follow 1 to 5 hops maximum. Auto-avoids revisiting nodes.
+      </div>
+    </div>
+    
+    <div class="info-box orange">
+      <div class="info-title">Relationships Can Have Properties Too</div>
+      <div class="info-text">
+        <code>(John) -[:WORKS_AT {since: 2019, position: "Senior Eng", salary: 120000}]→ (TechCorp)</code><br><br>
+        The relationship record has its own property chain (linked list), just like nodes. Useful for storing metadata about the connection itself — when it started, the role, etc.
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 5: Comparison -->
+  <div id="compare" class="panel">
+    <h2>When to Use What</h2>
+    
+    <table class="compare-table">
+      <tr>
+        <th>Question Type</th>
+        <th>Best Store</th>
+        <th>Why</th>
+      </tr>
+      <tr>
+        <td>"Get loan APP-001 details"</td>
+        <td style="color:#22c55e">MongoDB / SQL</td>
+        <td>Simple document lookup — CRUD</td>
+      </tr>
+      <tr>
+        <td>"List all loans this month"</td>
+        <td style="color:#22c55e">MongoDB / SQL</td>
+        <td>Filter + aggregate on structured records</td>
+      </tr>
+      <tr>
+        <td>"What does the DTI regulation say?"</td>
+        <td style="color:#71b7ff">Vector DB (FAISS)</td>
+        <td>Semantic search over document content</td>
+      </tr>
+      <tr>
+        <td>"What industry is John's employer in?"</td>
+        <td style="color:#a855f7">Graph DB (Neo4j)</td>
+        <td>2-hop relationship traversal</td>
+      </tr>
+      <tr>
+        <td>"What's the default rate for John's industry?"</td>
+        <td style="color:#a855f7">Graph DB (Neo4j)</td>
+        <td>3-hop traversal: borrower → employer → industry → risk</td>
+      </tr>
+      <tr>
+        <td>"Find similar past loans with outcomes"</td>
+        <td style="color:#a855f7">Graph DB (Neo4j)</td>
+        <td>Multi-hop pattern matching across entities</td>
+      </tr>
+      <tr>
+        <td>"Is this borrower connected to flagged entities?"</td>
+        <td style="color:#a855f7">Graph DB (Neo4j)</td>
+        <td>Fraud network — variable depth traversal</td>
+      </tr>
+      <tr>
+        <td>"What regulations apply to this Texas loan?"</td>
+        <td style="color:#f97316">Graph + Vector</td>
+        <td>Graph finds regulations, Vector gets full text</td>
+      </tr>
+    </table>
+    
+    <h2>Your Underwriting System Architecture</h2>
+    <div class="info-box">
+      <div class="info-title">Polyglot Persistence — Right Store for Right Job</div>
+      <div class="info-text">
+        <strong>MongoDB (DocumentDB)</strong> — Primary store. All CRUD, UI, reports. Loan documents, borrower profiles, amendments, payments.<br><br>
+        <strong>Neo4j</strong> — AI knowledge graph. Relationship traversal for risk context, similar loans, regulatory mapping. Read-only, synced from MongoDB.<br><br>
+        <strong>FAISS / OpenSearch</strong> — Vector store. Semantic search over policy documents. RAG retrieval.<br><br>
+        <strong>Redis</strong> — Caching. Session data, frequently accessed records.<br><br>
+        <strong>PostgreSQL</strong> — Analytics. Complex aggregations via Glue ETL.<br><br>
+        <em>You already do this in Camelot (DocumentDB + Redis + PostgreSQL). Adding Neo4j for AI agents is the same pattern.</em>
+      </div>
+    </div>
+    
+    <div class="info-box red">
+      <div class="info-title">DON'T Replace MongoDB with Graph DB</div>
+      <div class="info-text">
+        MongoDB is perfect for Camelot's CRUD operations. Graph DB would make simple queries harder. Add Neo4j alongside as a secondary read-only store for AI agent use cases only. Sync selectively — only entities and relationships (~10% of data).
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function showTab(tabId) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById(tabId).classList.add('active');
+  event.target.classList.add('active');
+}
+
+const nodeData = {
+  john: { title: 'Borrower: John Doe', color: '', items: [
+    'Properties: name="John Doe", fico=740, income=$120K',
+    'Relationships: WORKS_AT→TechCorp, APPLIED_FOR→APP-001',
+    'Storage: Node ID 4200, position = 4200×15 = byte 63000',
+    'First relationship pointer → REL#8100 (WORKS_AT)',
+    'First property pointer → PROP#AA00 (name="John Doe")',
+  ]},
+  jane: { title: 'Borrower: Jane Smith', color: '', items: [
+    'Properties: name="Jane Smith", fico=680, income=$85K',
+    'Relationships: WORKS_AT→TechCorp',
+    'Same company as John — found by traversing TechCorp\'s relationship chain',
+  ]},
+  techcorp: { title: 'Company: TechCorp Inc', color: 'green', items: [
+    'Properties: name="TechCorp", founded=2015, employees=500',
+    'Relationships: IN_INDUSTRY→Technology, ←WORKS_AT←John, ←WORKS_AT←Jane',
+    'Relationship chain: rel1(John) → rel2(Jane) → rel3(IN_INDUSTRY) → NULL',
+    'One-to-many: multiple WORKS_AT relationships form a linked list',
+  ]},
+  tech_industry: { title: 'Industry: Technology', color: 'purple', items: [
+    'Properties: name="Technology", avg_default_rate=3.2%',
+    'Relationships: ←IN_INDUSTRY←TechCorp, ←IN_INDUSTRY←OtherCo, HAS_RISK→RiskProfile',
+    'Query: "Find all companies in Technology" → follow all IN_INDUSTRY relationships backward',
+    'This is what MySQL needs 3+ JOINs for but graph does with pointer traversal',
+  ]},
+  loan: { title: 'Loan Application: APP-001', color: 'green', items: [
+    'Properties: id="APP-001", amount=$350K, status="pending", type="conventional"',
+    'Relationships: ←APPLIED_FOR←John, SECURED_BY→123 Main St',
+    'Finding similar loans: traverse Industry → all borrowers → their loans',
+  ]},
+  property: { title: 'Property: 123 Main St', color: 'orange', items: [
+    'Properties: address="123 Main St", value=$440K, sqft=2400',
+    'Relationships: ←SECURED_BY←APP-001, LOCATED_IN→Texas',
+    'Following: Property → State → Regulations finds applicable rules',
+  ]},
+  texas: { title: 'State: Texas', color: 'red', items: [
+    'Properties: name="Texas", code="TX"',
+    'Relationships: ←LOCATED_IN←properties, GOVERNED_BY→Section50, GOVERNED_BY→TRID',
+    'All properties in Texas found by traversing ←LOCATED_IN backward',
+    'All Texas regulations found by traversing GOVERNED_BY forward',
+  ]},
+  regulation: { title: 'Regulation: Section 50(a)(6)', color: 'red', items: [
+    'Properties: name="Section 50(a)(6)", max_ltv=80%, no_prepayment_penalty=true',
+    'Relationships: ←GOVERNED_BY←Texas',
+    'Graph + Vector DB together: Graph finds WHICH regulation applies, Vector DB has full text',
+  ]},
+  risk: { title: 'Risk Profile: Technology Industry', color: 'purple', items: [
+    'Properties: default_rate=3.2%, avg_recovery=0.65, volatility="LOW"',
+    'Relationships: ←HAS_RISK←Technology industry',
+    'This data enriches the Risk Scoring agent\'s assessment',
+    'Impossible to get from document search — requires relationship traversal',
+  ]},
+};
+
+function showNodeInfo(nodeId) {
+  const data = nodeData[nodeId];
+  const box = document.getElementById('nodeInfo');
+  box.innerHTML = `<div class="info-box ${data.color}">
+    <div class="info-title">${data.title}</div>
+    <div class="info-text">${data.items.map(i => '• ' + i).join('<br>')}</div>
+  </div>`;
+}
+
+let animInterval;
+function animateTraversal() {
+  resetTraversal();
+  const sqlIds = ['sql1','sql2','sql3','sql4','sql5','sql6'];
+  const gIds = ['g1','g2','g3','g4','g5'];
+  let step = 0;
+  const maxSteps = Math.max(sqlIds.length, gIds.length);
+  
+  animInterval = setInterval(() => {
+    if (step > 0) {
+      if (sqlIds[step-1]) document.getElementById(sqlIds[step-1]).classList.replace('active','done');
+      if (gIds[step-1]) document.getElementById(gIds[step-1]).classList.replace('active','done');
+    }
+    if (step >= maxSteps) { clearInterval(animInterval); return; }
+    if (sqlIds[step]) document.getElementById(sqlIds[step]).classList.add('active');
+    if (gIds[step]) document.getElementById(gIds[step]).classList.add('active');
+    step++;
+  }, 800);
+}
+
+function resetTraversal() {
+  clearInterval(animInterval);
+  document.querySelectorAll('.traversal-step').forEach(s => {
+    s.classList.remove('active','done');
+  });
+}
+</script>
+</body>
+</html>

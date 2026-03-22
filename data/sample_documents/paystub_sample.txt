@@ -1,0 +1,9 @@
+Pay Stub
+Employer Name: Acme Lending Services
+Employee Name: Jane Borrower
+Pay Period Start: 2024-12-01
+Pay Period End: 2024-12-15
+Gross Pay: 3326.92
+Net Pay: 2494.10
+YTD Gross: 86500.00
+Pay Frequency: BIWEEKLY

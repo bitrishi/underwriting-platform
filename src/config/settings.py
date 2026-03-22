@@ -20,6 +20,9 @@ class Settings:
     bedrock_model_id: str
     log_level: str
     environment: str
+    neo4j_uri: str
+    neo4j_user: str
+    neo4j_password: str
     
     def __post_init__(self) -> None:
         """Validate settings after initialization."""
@@ -74,6 +77,9 @@ def load_settings() -> Settings:
         ),
         log_level=os.getenv("LOG_LEVEL", "INFO"),
         environment=os.getenv("ENVIRONMENT", "development"),
+        neo4j_uri=os.getenv("NEO4J_URI", "bolt://localhost:7687"),
+        neo4j_user=os.getenv("NEO4J_USER", "neo4j"),
+        neo4j_password=os.getenv("NEO4J_PASSWORD", "neo4jpassword"),
     )
 
 
@@ -88,6 +94,8 @@ if __name__ == "__main__":
     print(f"  Bedrock Model: {settings.bedrock_model_id}")
     print(f"  Log Level: {settings.log_level}")
     print(f"  Environment: {settings.environment}")
+    print(f"  Neo4j URI: {settings.neo4j_uri}")
+    print(f"  Neo4j User: {settings.neo4j_user}")
     print(f"  Is Production: {settings.is_production}")
     print(f"  Is Development: {settings.is_development}")
     print(f"  Is Staging: {settings.is_staging}")

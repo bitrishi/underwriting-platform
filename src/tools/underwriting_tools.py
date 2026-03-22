@@ -83,31 +83,35 @@ def check_fico_eligibility(fico_score: int) -> dict:
         "detail": f"FICO {fico_score} — {tier}"
     }
 
-    def check_employment_stability(years: float) -> dict:
-        """Evaluate employment stability for underwriting.
-        
-        Use this tool to assess the risk associated with the
-        borrower's employment history.
-        
-        Args:
-            years: Number of years in current employment
-            
-        Returns:
-            Stability status, risk level, and threshold information
-        """
-        if years >= 5:
-            stability = "HIGHLY_STABLE"
-        elif years >= 2:
-            stability = "STABLE"
-        elif years >= 1:
-            stability = "MARGINALLY_STABLE"
-        else:
-            stability = "UNSTABLE"
-        
-        return {
-            "employment_years": years,
-            "stability": stability,
-            "threshold": 2,
-            "meets_threshold": years >= 2,
-            "detail": f"Employment {years} years — {stability}"
-        }       
+
+@tool
+def check_employment_stability(years: float) -> dict:
+    """Evaluate employment stability for underwriting.
+
+    Use this tool to assess the risk associated with employment tenure.
+
+    Args:
+        years: Number of years at the current employer.
+
+    Returns:
+        Stability status, threshold checks, and explanatory detail.
+    """
+    if years < 0:
+        raise ValueError("years must be non-negative")
+
+    if years >= 5:
+        stability = "HIGHLY_STABLE"
+    elif years >= 2:
+        stability = "STABLE"
+    elif years >= 1:
+        stability = "MARGINALLY_STABLE"
+    else:
+        stability = "UNSTABLE"
+
+    return {
+        "employment_years": years,
+        "stability": stability,
+        "threshold": 2,
+        "meets_threshold": years >= 2,
+        "detail": f"Employment {years:.1f} years — {stability}",
+    }
