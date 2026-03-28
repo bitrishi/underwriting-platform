@@ -8,6 +8,30 @@ from typing import Annotated, Any, TypedDict
 from langgraph.graph import add_messages
 
 
+def merge_string_dicts(
+    left: dict[str, str] | None,
+    right: dict[str, str] | None,
+) -> dict[str, str]:
+    merged: dict[str, str] = {}
+    if left:
+        merged.update(left)
+    if right:
+        merged.update(right)
+    return merged
+
+
+def merge_float_dicts(
+    left: dict[str, float] | None,
+    right: dict[str, float] | None,
+) -> dict[str, float]:
+    merged: dict[str, float] = {}
+    if left:
+        merged.update(left)
+    if right:
+        merged.update(right)
+    return merged
+
+
 class UnderwritingState(TypedDict, total=False):
     """State bag accumulated across orchestrator node execution."""
 
@@ -15,6 +39,8 @@ class UnderwritingState(TypedDict, total=False):
     app_id: str
     document_paths: list[str]
     loan_type: str
+    graph_version: str
+    thread_id: str
 
     # Agent outputs
     borrower_package: dict[str, Any] | None
@@ -36,6 +62,15 @@ class UnderwritingState(TypedDict, total=False):
 
     # Final output
     final_decision: str | None
+    final_report: str | None
+
+    # Audit metadata
+    node_timestamps: Annotated[dict[str, str], merge_string_dicts]
+    node_durations_s: Annotated[dict[str, float], merge_float_dicts]
+    node_execution_order: Annotated[list[str], add]
+    total_tool_calls: int
+    total_llm_calls: int
+    estimated_cost_usd: float
 
     # Observability
     messages: Annotated[list, add_messages]

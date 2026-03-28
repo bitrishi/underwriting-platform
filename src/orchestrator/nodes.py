@@ -3,14 +3,16 @@
 from __future__ import annotations
 
 import json
+import time
+from datetime import UTC, datetime
 from typing import Any
 
-from pydantic import ValidationError
 from langgraph.types import interrupt
+from pydantic import ValidationError
 
+from src.agents.compliance import create_compliance_agent
 from src.agents.doc_review import create_doc_review_agent
 from src.agents.fetch_data import create_fetch_data_agent
-from src.agents.compliance import create_compliance_agent
 from src.agents.risk_scoring import (
     build_risk_assessment,
     create_risk_scoring_agent,
@@ -26,21 +28,22 @@ from src.models.borrower import (
     EmploymentRecord,
     PolicyContext,
 )
-from src.models.risk import IndustryContext, RiskAssessment
 from src.models.compliance import ComplianceCheck, ComplianceResult
 from src.models.human_review import HumanReviewRequest, HumanReviewResponse
+from src.models.risk import IndustryContext, RiskAssessment
 from src.orchestrator.state import UnderwritingState
+from src.pipeline.report_formatter import format_underwriting_report
 from src.tools.fetch_tools import (
     pull_borrower_data,
     pull_credit_report,
     pull_employment_history,
 )
 from src.tools.policy_tools import search_lending_policies
-from src.tools.policy_tools_v2 import verify_compliance_requirement
 from src.tools.compliance_tools import (
     check_disclosure_requirements,
     verify_audit_trail,
 )
+from src.tools.policy_tools_v2 import verify_compliance_requirement
 from src.tools.underwriting_tools import calculate_dti, calculate_ltv
 
 
@@ -72,6 +75,50 @@ def _invoke_agent(agent: Any, prompt: str) -> str:
         return str(result["output"])
 
     return str(result)
+
+
+def _now_iso() -> str:
+    return datetime.now(UTC).isoformat()
+
+
+def _stamp_node(state: UnderwritingState, node_name: str, started_at: float) -> dict[str, Any]:
+    timestamps = dict(state.get("node_timestamps", {}))
+    durations = dict(state.get("node_durations_s", {}))
+    timestamps[node_name] = _now_iso()
+    durations[node_name] = round(time.perf_counter() - started_at, 6)
+    return {
+        "node_timestamps": timestamps,
+        "node_durations_s": durations,
+        "node_execution_order": [node_name],
+    }
+
+
+def _estimate_usage_counts(state: UnderwritingState) -> tuple[int, int, float]:
+    tool_calls = 0
+    llm_calls = 0
+
+    if state.get("borrower_package"):
+        tool_calls += 4
+        llm_calls += 1
+
+    doc = state.get("document_review") or {}
+    if doc and doc.get("status") == "COMPLETED":
+        tool_calls += 4
+        llm_calls += 1
+
+    if state.get("risk_assessment"):
+        tool_calls += 8
+        llm_calls += 1
+
+    if state.get("loan_type", "conventional").lower() == "fha":
+        tool_calls += 1
+
+    if state.get("compliance_result"):
+        tool_calls += 4
+        llm_calls += 1
+
+    estimated_cost = round((llm_calls * 0.0012) + (tool_calls * 0.00005), 6)
+    return tool_calls, llm_calls, estimated_cost
 
 
 def _infer_industry(borrower_package: dict[str, Any]) -> str:
@@ -135,6 +182,7 @@ def _industry_context(industry: str) -> IndustryContext:
 
 def fetch_data_node(state: UnderwritingState) -> dict[str, Any]:
     """Run the FetchData agent and assemble a structured borrower package."""
+    started_at = time.perf_counter()
     errors = list(state.get("errors", []))
     try:
         app_id = state.get("app_id", "")
@@ -189,6 +237,7 @@ def fetch_data_node(state: UnderwritingState) -> dict[str, Any]:
                 "has_documents": bool(state.get("document_paths")),
                 "fatal_error": False,
                 "errors": errors,
+                **_stamp_node(state, "fetch_data", started_at),
                 "messages": [
                     (
                         "assistant",
@@ -205,6 +254,7 @@ def fetch_data_node(state: UnderwritingState) -> dict[str, Any]:
                 "has_documents": bool(state.get("document_paths")),
                 "fatal_error": True,
                 "errors": errors,
+                **_stamp_node(state, "fetch_data", started_at),
                 "messages": [("assistant", f"FetchData failed: {exc}")],
             }
     except Exception as exc:
@@ -214,12 +264,14 @@ def fetch_data_node(state: UnderwritingState) -> dict[str, Any]:
             "has_documents": bool(state.get("document_paths")),
             "fatal_error": True,
             "errors": errors,
+            **_stamp_node(state, "fetch_data", started_at),
             "messages": [("assistant", f"FetchData unhandled error: {exc}")],
         }
 
 
 def doc_review_node(state: UnderwritingState) -> dict[str, Any]:
     """Run the Doc Review agent and store a review package summary."""
+    started_at = time.perf_counter()
     errors = list(state.get("errors", []))
     try:
         docs = state.get("document_paths", []) or []
@@ -257,6 +309,7 @@ def doc_review_node(state: UnderwritingState) -> dict[str, Any]:
             return {
                 "document_review": skipped_review,
                 "errors": errors,
+                **_stamp_node(state, "doc_review", started_at),
                 "messages": [("assistant", "Document Review skipped (no documents provided).")],
             }
 
@@ -313,6 +366,7 @@ def doc_review_node(state: UnderwritingState) -> dict[str, Any]:
             return {
                 "document_review": review,
                 "errors": errors,
+                **_stamp_node(state, "doc_review", started_at),
                 "messages": [
                     (
                         "assistant",
@@ -337,6 +391,7 @@ def doc_review_node(state: UnderwritingState) -> dict[str, Any]:
                     "agent_summary": "",
                 },
                 "errors": errors,
+                **_stamp_node(state, "doc_review", started_at),
                 "messages": [("assistant", f"Document Review failed: {exc}")],
             }
     except Exception as exc:
@@ -355,12 +410,14 @@ def doc_review_node(state: UnderwritingState) -> dict[str, Any]:
                 "agent_summary": "",
             },
             "errors": errors,
+            **_stamp_node(state, "doc_review", started_at),
             "messages": [("assistant", f"Document Review unhandled error: {exc}")],
         }
 
 
 def risk_scoring_node(state: UnderwritingState) -> dict[str, Any]:
     """Run the Risk Scoring agent and generate a structured risk assessment."""
+    started_at = time.perf_counter()
     errors = list(state.get("errors", []))
     try:
         borrower_package = state.get("borrower_package")
@@ -372,8 +429,9 @@ def risk_scoring_node(state: UnderwritingState) -> dict[str, Any]:
             errors.append("risk_scoring_skipped_missing_borrower_package")
             return {
                 "risk_assessment": None,
-                "needs_manual_review": True,
+                "needs_manual_review": not bool(state.get("fatal_error", False)),
                 "errors": errors,
+                **_stamp_node(state, "risk_scoring", started_at),
                 "messages": [("assistant", msg)],
             }
 
@@ -440,6 +498,7 @@ def risk_scoring_node(state: UnderwritingState) -> dict[str, Any]:
                 "risk_assessment": risk_payload,
                 "needs_manual_review": assessment.recommendation in {"MANUAL_REVIEW", "DENY"},
                 "errors": errors,
+                **_stamp_node(state, "risk_scoring", started_at),
                 "messages": [
                     (
                         "assistant",
@@ -454,6 +513,7 @@ def risk_scoring_node(state: UnderwritingState) -> dict[str, Any]:
                 "risk_assessment": None,
                 "needs_manual_review": True,
                 "errors": errors,
+                **_stamp_node(state, "risk_scoring", started_at),
                 "messages": [("assistant", f"Risk Scoring failed: {exc}")],
             }
     except Exception as exc:
@@ -462,14 +522,33 @@ def risk_scoring_node(state: UnderwritingState) -> dict[str, Any]:
             "risk_assessment": None,
             "needs_manual_review": True,
             "errors": errors,
+            **_stamp_node(state, "risk_scoring", started_at),
             "messages": [("assistant", f"Risk Scoring unhandled error: {exc}")],
         }
 
 
 def compliance_node(state: UnderwritingState) -> dict[str, Any]:
     """Run compliance validation using deterministic and RAG-backed checks."""
+    started_at = time.perf_counter()
     errors = list(state.get("errors", []))
     try:
+        if state.get("fatal_error"):
+            return {
+                "compliance_result": {
+                    "required_disclosures": [],
+                    "fair_lending_flag": False,
+                    "audit_trail_complete": False,
+                    "blocking_violations": ["skipped_due_to_fatal_error"],
+                    "recommendation_override": "NONE",
+                    "checks": [],
+                    "summary": "Compliance skipped due to fatal upstream fetch failure.",
+                },
+                "needs_manual_review": False,
+                "errors": errors,
+                **_stamp_node(state, "compliance", started_at),
+                "messages": [("assistant", "Compliance skipped due to fatal error.")],
+            }
+
         risk_assessment = state.get("risk_assessment") or {}
         borrower_package = state.get("borrower_package") or {}
         recommendation = str(risk_assessment.get("recommendation", "MANUAL_REVIEW")).upper()
@@ -559,6 +638,7 @@ def compliance_node(state: UnderwritingState) -> dict[str, Any]:
             "compliance_result": payload,
             "needs_manual_review": needs_manual_review,
             "errors": errors,
+            **_stamp_node(state, "compliance", started_at),
             "messages": [("assistant", result.summary)],
         }
     except Exception as exc:
@@ -575,12 +655,14 @@ def compliance_node(state: UnderwritingState) -> dict[str, Any]:
             },
             "needs_manual_review": True,
             "errors": errors,
+            **_stamp_node(state, "compliance", started_at),
             "messages": [("assistant", f"Compliance failed: {exc}")],
         }
 
 
 def fha_compliance_node(state: UnderwritingState) -> dict[str, Any]:
     """Run FHA-specific pre-compliance checks before standard compliance."""
+    started_at = time.perf_counter()
     errors = list(state.get("errors", []))
     risk = state.get("risk_assessment") or {}
     borrower = (state.get("borrower_package") or {}).get("borrower", {})
@@ -615,6 +697,7 @@ def fha_compliance_node(state: UnderwritingState) -> dict[str, Any]:
             "fha_compliance_result": result,
             "needs_manual_review": needs_manual_review,
             "errors": errors,
+            **_stamp_node(state, "fha_compliance", started_at),
             "messages": [("assistant", result["summary"])],
         }
     except Exception as exc:
@@ -627,12 +710,14 @@ def fha_compliance_node(state: UnderwritingState) -> dict[str, Any]:
             },
             "needs_manual_review": True,
             "errors": errors,
+            **_stamp_node(state, "fha_compliance", started_at),
             "messages": [("assistant", f"FHA checks failed: {exc}")],
         }
 
 
 def fatal_error_node(state: UnderwritingState) -> dict[str, Any]:
     """Consolidate fatal pipeline errors before final decision output."""
+    started_at = time.perf_counter()
     errors = list(state.get("errors", []))
     if not errors:
         errors.append("fatal_error_node_reached_without_error_context")
@@ -641,6 +726,7 @@ def fatal_error_node(state: UnderwritingState) -> dict[str, Any]:
         "fatal_error": True,
         "needs_manual_review": True,
         "errors": errors,
+        **_stamp_node(state, "fatal_error", started_at),
         "messages": [
             (
                 "assistant",
@@ -652,6 +738,7 @@ def fatal_error_node(state: UnderwritingState) -> dict[str, Any]:
 
 def human_review_node(state: UnderwritingState) -> dict[str, Any]:
     """Pause for human decision and persist response on resume."""
+    started_at = time.perf_counter()
     errors = list(state.get("errors", []))
     risk = state.get("risk_assessment") or {}
     compliance = state.get("compliance_result") or {}
@@ -776,10 +863,6 @@ def human_review_node(state: UnderwritingState) -> dict[str, Any]:
     if needs_additional_data:
         current_iterations += 1
 
-    if needs_additional_data and current_iterations >= 3:
-        errors.append("max_iterations_reached: finalizing without additional loop")
-        needs_additional_data = False
-
     return {
         "human_review_request": request.model_dump(),
         "human_review_response": response.model_dump(),
@@ -788,13 +871,14 @@ def human_review_node(state: UnderwritingState) -> dict[str, Any]:
         "additional_data_request": additional_data_request,
         "review_iterations": current_iterations,
         "errors": errors,
+        **_stamp_node(state, "human_review", started_at),
         "messages": [
             (
                 "assistant",
                 (
                     f"Human review completed with decision={response.decision}."
                     if not needs_additional_data
-                    else "Human requested additional data; looping back to fetch_data."
+                    else "Human review noted additional data request for audit trail."
                 ),
             )
         ],
@@ -803,6 +887,7 @@ def human_review_node(state: UnderwritingState) -> dict[str, Any]:
 
 def final_decision_node(state: UnderwritingState) -> dict[str, Any]:
     """Create a complete, audit-ready underwriting report."""
+    started_at = time.perf_counter()
     app_id = state.get("app_id", "UNKNOWN")
     borrower_package = state.get("borrower_package")
     document_review = state.get("document_review")
@@ -862,7 +947,7 @@ def final_decision_node(state: UnderwritingState) -> dict[str, Any]:
         )
 
     if state.get("fatal_error"):
-        recommendation = "MANUAL_REVIEW"
+        recommendation = "DENY"
 
     human_section = "Human review not required"
     if human_review_response:
@@ -876,43 +961,37 @@ def final_decision_node(state: UnderwritingState) -> dict[str, Any]:
             f"notes={notes}"
         )
 
-    full_report = "\n".join(
-        [
-            "=" * 80,
-            f"UNDERWRITING DECISION REPORT | App ID: {app_id}",
-            "=" * 80,
-            "",
-            "BORROWER SUMMARY",
-            borrower_summary,
-            "",
-            "DOCUMENT REVIEW",
-            doc_summary,
-            "",
-            "RISK ASSESSMENT",
-            risk_block,
-            "",
-            "COMPLIANCE",
-            compliance_summary,
-            "",
-            "FHA COMPLIANCE",
-            fha_summary,
-            "",
-            "HUMAN REVIEW",
-            human_section,
-            f"additional_data_request={additional_data_request}",
-            f"review_iterations={review_iterations}",
-            "",
-            "PIPELINE STATUS",
-            f"needs_manual_review={state.get('needs_manual_review', False)}",
-            f"fatal_error={state.get('fatal_error', False)}",
-            f"recommendation={recommendation}",
-            f"errors={len(errors)}",
-            json.dumps(errors, indent=2) if errors else "[]",
-            "",
-        ]
+    thread_id = str(state.get("thread_id", ""))
+    tool_calls, llm_calls, estimated_cost = _estimate_usage_counts(state)
+
+    stitched_state = dict(state)
+    stitched_state.update(
+        {
+            "app_id": app_id,
+            "total_tool_calls": tool_calls,
+            "total_llm_calls": llm_calls,
+            "estimated_cost_usd": estimated_cost,
+            "computed_borrower_summary": borrower_summary,
+            "computed_doc_summary": doc_summary,
+            "computed_risk_block": risk_block,
+            "computed_compliance_summary": compliance_summary,
+            "computed_fha_summary": fha_summary,
+            "computed_human_summary": human_section,
+            "computed_recommendation": recommendation,
+            "additional_data_request": additional_data_request,
+            "review_iterations": review_iterations,
+            "thread_id": thread_id,
+        }
     )
+
+    full_report = format_underwriting_report(stitched_state)
 
     return {
         "final_decision": full_report,
+        "final_report": full_report,
+        "total_tool_calls": tool_calls,
+        "total_llm_calls": llm_calls,
+        "estimated_cost_usd": estimated_cost,
+        **_stamp_node(state, "final_decision", started_at),
         "messages": [("assistant", "Final decision report generated.")],
     }

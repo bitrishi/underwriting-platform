@@ -1,4 +1,4 @@
-"""StateGraph builder for the three-agent underwriting workflow."""
+"""StateGraph builder for the full underwriting orchestration workflow."""
 
 from __future__ import annotations
 
@@ -6,9 +6,9 @@ from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, START, StateGraph
 
 from src.orchestrator.edges import (
-    route_after_human_review,
+    route_by_loan_type,
+    should_continue_after_fetch,
     should_escalate,
-    should_route_after_fetch,
 )
 from src.orchestrator.nodes import (
     compliance_node,
@@ -22,13 +22,8 @@ from src.orchestrator.nodes import (
 )
 from src.orchestrator.state import UnderwritingState
 
-
-def route_by_loan_type(state: UnderwritingState) -> str:
-    """Route risk scoring output to loan-type-specific compliance sequence."""
-    loan_type = str(state.get("loan_type", "conventional")).strip().lower()
-    if loan_type == "fha":
-        return "fha_compliance"
-    return "compliance"
+# Imported for compatibility with existing monkeypatch-based tests.
+_ = fatal_error_node
 
 
 def create_underwriting_graph(checkpointer: MemorySaver | None = None):
@@ -43,7 +38,6 @@ def create_underwriting_graph(checkpointer: MemorySaver | None = None):
     graph.add_node("risk_scoring", risk_scoring_node)
     graph.add_node("fha_compliance", fha_compliance_node)
     graph.add_node("compliance", compliance_node)
-    graph.add_node("fatal_error", fatal_error_node)
     graph.add_node("human_review", human_review_node)
     graph.add_node("final_decision", final_decision_node)
 
@@ -52,9 +46,9 @@ def create_underwriting_graph(checkpointer: MemorySaver | None = None):
 
     graph.add_conditional_edges(
         "fetch_data",
-        should_route_after_fetch,
+        should_continue_after_fetch,
         {
-            "fatal_error": "fatal_error",
+            "final_decision": "final_decision",
             "continue": "risk_scoring",
         },
     )
@@ -81,15 +75,7 @@ def create_underwriting_graph(checkpointer: MemorySaver | None = None):
         },
     )
 
-    graph.add_edge("fatal_error", "final_decision")
-    graph.add_conditional_edges(
-        "human_review",
-        route_after_human_review,
-        {
-            "fetch_data": "fetch_data",
-            "final_decision": "final_decision",
-        },
-    )
+    graph.add_edge("human_review", "final_decision")
     graph.add_edge("final_decision", END)
 
     saver = checkpointer or MemorySaver()

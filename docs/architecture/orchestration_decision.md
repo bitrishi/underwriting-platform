@@ -10,6 +10,16 @@ Choose **LangGraph** as the default orchestration framework for the underwriting
 - Strong failure routing: node-level try/except and conditional paths support graceful degradation.
 - Compliance-first behavior: escalation and manual review routing are first-class graph decisions.
 - Better production operability: explicit topology is easier to inspect, replay, and monitor.
+- Built-in interrupt/resume primitives match human-underwriter workflows.
+- Checkpointing model aligns with resumable long-running underwriting decisions.
+
+## Agent Boundary Decision
+- `fetch_data`: external borrower/credit/employment retrieval.
+- `doc_review`: document extraction and package-quality checks.
+- `risk_scoring`: deterministic metrics + RAG + graph context synthesis.
+- `compliance`: legal/disclosure/audit validation and escalation authority.
+
+These boundaries reduce prompt conflict, keep tool sets coherent, and allow model specialization (Haiku for deterministic-heavy tasks, Sonnet for vision/legal reasoning).
 
 ## When CrewAI Is a Better Fit
 - Fast role-based prototypes where speed of iteration matters more than rigid control flow.

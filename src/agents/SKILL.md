@@ -338,6 +338,22 @@ agent.invoke(payload, config={"callbacks": [tracer]})
 - Prefer deterministic settings (`temperature=0`) for underwriting and compliance
   use cases.
 
+## Four-Agent Assignment (Final)
+
+| Agent | File | Model | Primary Tools |
+|---|---|---|---|
+| FetchData | `src/agents/fetch_data.py` | Haiku | `pull_borrower_data`, `pull_credit_report`, `pull_employment_history`, `search_lending_policies` |
+| Doc Review | `src/agents/doc_review.py` | Sonnet | `classify_document`, `extract_document_data`, `compare_documents`, `validate_document_package` |
+| Risk Scoring | `src/agents/risk_scoring.py` | Haiku | `calculate_dti`, `calculate_ltv`, `check_fico_eligibility`, `check_employment_stability`, `search_lending_policies`, `verify_compliance_requirement`, `get_borrower_risk_context`, `find_similar_past_loans` |
+| Compliance | `src/agents/compliance.py` | Sonnet | `verify_compliance_requirement`, `search_lending_policies`, `check_disclosure_requirements`, `verify_audit_trail` |
+
+### Boundary Rationale
+
+- FetchData owns borrower data acquisition and raw context gathering.
+- Doc Review owns document processing and package completeness.
+- Risk Scoring owns credit/risk synthesis across deterministic + RAG + graph inputs.
+- Compliance owns legal/procedural checks and escalation overrides.
+
 ## Compatibility Notes
 
 - `create_tool_calling_agent`/`AgentExecutor` style setup has been migrated to

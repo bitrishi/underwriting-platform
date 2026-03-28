@@ -5,8 +5,17 @@ from __future__ import annotations
 from src.orchestrator.state import UnderwritingState
 
 
+def should_continue_after_fetch(state: UnderwritingState) -> str:
+    """Route fetch failures directly to final_decision, otherwise continue."""
+    if state.get("fatal_error"):
+        return "final_decision"
+    if state.get("borrower_package") is None:
+        return "final_decision"
+    return "continue"
+
+
 def should_route_after_fetch(state: UnderwritingState) -> str:
-    """Route fetch failures to fatal handling before any downstream scoring."""
+    """Backward-compatible alias for previous function name."""
     if state.get("fatal_error"):
         return "fatal_error"
     if state.get("borrower_package") is None:
@@ -20,8 +29,20 @@ def should_review_documents(state: UnderwritingState) -> str:
     return "doc_review" if len(document_paths) > 0 else "risk_scoring"
 
 
+def should_continue_after_doc_review(state: UnderwritingState) -> str:
+    """Prevent downstream scoring when fetch_data already fatally failed."""
+    if state.get("fatal_error"):
+        return "final_decision"
+    if state.get("borrower_package") is None:
+        return "final_decision"
+    return "risk_scoring"
+
+
 def should_escalate(state: UnderwritingState) -> str:
     """Escalate to human review only for manual-review recommendations."""
+    if state.get("fatal_error"):
+        return "final_decision"
+
     compliance = state.get("compliance_result") or {}
     override = str(compliance.get("recommendation_override", "")).upper()
     if override == "MANUAL_REVIEW":
@@ -32,6 +53,14 @@ def should_escalate(state: UnderwritingState) -> str:
     if state.get("needs_manual_review") or recommendation == "MANUAL_REVIEW":
         return "human_review"
     return "final_decision"
+
+
+def route_by_loan_type(state: UnderwritingState) -> str:
+    """Optional dynamic routing from risk scoring to compliance branches."""
+    loan_type = str(state.get("loan_type", "conventional")).strip().lower()
+    if loan_type == "fha":
+        return "fha_compliance"
+    return "compliance"
 
 
 def route_after_human_review(state: UnderwritingState) -> str:
