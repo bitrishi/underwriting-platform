@@ -16,6 +16,47 @@ from pydantic import BaseModel, Field
 from typing import Literal
 
 
+class ComplianceCheck(BaseModel):
+    """Single compliance check result in the underwriting pipeline."""
+
+    name: str = Field(..., description="Name of the compliance check")
+    passed: bool = Field(..., description="Whether the check passed")
+    detail: str = Field(..., description="Human-readable check explanation")
+
+
+class ComplianceResult(BaseModel):
+    """Compliance output consumed by orchestrator decision routing."""
+
+    required_disclosures: list[dict] = Field(
+        default_factory=list,
+        description="Required disclosures with regulation and timing metadata",
+    )
+    fair_lending_flag: bool = Field(
+        False,
+        description="True when potential fair lending issues are detected",
+    )
+    audit_trail_complete: bool = Field(
+        True,
+        description="True when risk assessment includes complete audit evidence",
+    )
+    blocking_violations: list[str] = Field(
+        default_factory=list,
+        description="Violations that block automatic approval",
+    )
+    recommendation_override: Literal["NONE", "MANUAL_REVIEW", "DENY"] = Field(
+        "NONE",
+        description="Compliance override applied to risk recommendation",
+    )
+    checks: list[ComplianceCheck] = Field(
+        default_factory=list,
+        description="Per-check outcomes supporting the final compliance verdict",
+    )
+    summary: str = Field(
+        "",
+        description="Audit-friendly summary for decision report output",
+    )
+
+
 class IrrelevantDocument(BaseModel):
     """A document that was retrieved but deemed not relevant to the question."""
 

@@ -1,0 +1,455 @@
+# Create an interactive HTML workflow diagram showing the full interrupt/resume cycle
+
+html_content = """<!DOCTYPE html>
+<html>
+<head>
+<style>
+    body { font-family: Calibri, sans-serif; margin: 20px; background: #f5f5f5; }
+    .container { max-width: 1200px; margin: 0 auto; }
+    h1 { text-align: center; color: #1a1a2e; }
+    h2 { color: #16213e; border-bottom: 2px solid #0f3460; padding-bottom: 5px; }
+    
+    .tabs { display: flex; gap: 5px; margin-bottom: 0; }
+    .tab { padding: 10px 20px; background: #ddd; border: none; cursor: pointer; 
+           border-radius: 8px 8px 0 0; font-size: 14px; font-weight: bold; }
+    .tab.active { background: #fff; border-bottom: 2px solid #fff; }
+    .tab-content { display: none; background: #fff; padding: 25px; border-radius: 0 8px 8px 8px;
+                   box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+    .tab-content.active { display: block; }
+    
+    .diagram { background: #fafafa; border: 1px solid #ddd; border-radius: 8px; 
+               padding: 20px; margin: 15px 0; overflow-x: auto; }
+    .diagram pre { font-family: 'Courier New', monospace; font-size: 13px; line-height: 1.5; margin: 0; }
+    
+    .node { display: inline-block; padding: 8px 16px; border-radius: 6px; margin: 4px;
+            font-weight: bold; font-size: 13px; }
+    .node-active { background: #4CAF50; color: white; }
+    .node-complete { background: #2196F3; color: white; }
+    .node-waiting { background: #FF9800; color: white; }
+    .node-pending { background: #9E9E9E; color: white; }
+    .node-interrupted { background: #f44336; color: white; animation: pulse 1.5s infinite; }
+    
+    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.6; } }
+    
+    .checkpoint-box { background: #fff3e0; border: 2px solid #ff9800; border-radius: 8px;
+                      padding: 15px; margin: 10px 0; }
+    .checkpoint-box h4 { margin: 0 0 10px 0; color: #e65100; }
+    
+    .redis-box { background: #fce4ec; border: 2px solid #e91e63; border-radius: 8px;
+                 padding: 15px; margin: 10px 0; }
+    .redis-box h4 { margin: 0 0 10px 0; color: #c2185b; }
+    
+    .step { background: #e8f5e9; border-left: 4px solid #4CAF50; padding: 12px 15px;
+            margin: 10px 0; border-radius: 0 6px 6px 0; }
+    .step-interrupt { background: #fff3e0; border-left: 4px solid #ff9800; }
+    .step-resume { background: #e3f2fd; border-left: 4px solid #2196F3; }
+    .step-number { font-weight: bold; color: #2e7d32; margin-right: 8px; }
+    
+    .answer-box { background: #e8eaf6; border: 2px solid #3f51b5; border-radius: 8px;
+                  padding: 15px; margin: 15px 0; }
+    .answer-box h4 { margin: 0 0 10px 0; color: #283593; }
+    
+    .comparison { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin: 15px 0; }
+    .comp-left { background: #e8f5e9; padding: 15px; border-radius: 8px; }
+    .comp-right { background: #fff3e0; padding: 15px; border-radius: 8px; }
+    
+    table { width: 100%; border-collapse: collapse; margin: 15px 0; }
+    th { background: #1a1a2e; color: white; padding: 10px; text-align: left; }
+    td { padding: 8px 10px; border-bottom: 1px solid #eee; }
+    tr:hover { background: #f5f5f5; }
+    
+    .flow-arrow { color: #666; font-size: 20px; text-align: center; margin: 5px 0; }
+</style>
+</head>
+<body>
+<div class="container">
+<h1>Week 4, Day 4: Human-in-the-Loop & Checkpointing</h1>
+
+<div class="tabs">
+    <button class="tab active" onclick="showTab(0)">1. State Machine Flow</button>
+    <button class="tab" onclick="showTab(1)">2. Checkpoint Storage</button>
+    <button class="tab" onclick="showTab(2)">3. Interrupt/Resume Cycle</button>
+    <button class="tab" onclick="showTab(3)">4. Your Questions Answered</button>
+</div>
+
+<!-- TAB 1: STATE MACHINE FLOW -->
+<div class="tab-content active" id="tab0">
+<h2>The Complete State Machine with Interrupt</h2>
+
+<p>This is your LangGraph orchestrator as a state machine. Each box is a node. Each arrow is an edge. The <span class="node node-interrupted">RED</span> node is where the machine PAUSES for human input.</p>
+
+<div class="diagram"><pre>
+    ┌─────────────────────────────────────────────────────────────────┐
+    │                     LANGGRAPH STATE MACHINE                     │
+    │                                                                 │
+    │   ┌───────┐                                                     │
+    │   │ START │                                                     │
+    │   └───┬───┘                                                     │
+    │       │                                                         │
+    │       ├──────────────────┐                                      │
+    │       │                  │                                      │
+    │       ▼                  ▼                                      │
+    │  ┌──────────┐     ┌───────────┐                                 │
+    │  │fetch_data│     │doc_review │    ◄── PARALLEL (both start)    │
+    │  │  (Haiku) │     │ (Sonnet)  │                                 │
+    │  └────┬─────┘     └─────┬─────┘                                 │
+    │       │  checkpoint#1   │  checkpoint#2                         │
+    │       │                 │                                       │
+    │       └────────┬────────┘                                       │
+    │                │                                                │
+    │                ▼                                                 │
+    │       ┌──────────────┐                                          │
+    │       │ risk_scoring  │         ◄── WAITS for both              │
+    │       │   (Haiku)     │                                         │
+    │       └──────┬───────┘                                          │
+    │              │  checkpoint#3                                    │
+    │              ▼                                                   │
+    │       ┌──────────────┐                                          │
+    │       │  compliance   │                                         │
+    │       │  (Sonnet)     │                                         │
+    │       └──────┬───────┘                                          │
+    │              │  checkpoint#4                                    │
+    │              │                                                   │
+    │              ▼                                                   │
+    │     ┌────────────────┐     YES                                  │
+    │     │needs_manual_   ├──────────┐                               │
+    │     │  review?       │          │                               │
+    │     └───────┬────────┘          │                               │
+    │          NO │                   ▼                                │
+    │             │          ┌─────────────────┐                      │
+    │             │          │  human_review    │                      │
+    │             │          │                  │                      │
+    │             │          │  ██ INTERRUPT ██ │ ◄── MACHINE PAUSES   │
+    │             │          │  State → Redis   │     State saved      │
+    │             │          │  Process stops   │     Process exits    │
+    │             │          │                  │                      │
+    │             │          │  ... time passes │                      │
+    │             │          │                  │                      │
+    │             │          │  ██ RESUME ██    │ ◄── Human responds   │
+    │             │          │  Redis → State   │     State loaded     │
+    │             │          │  Process continues│    Continues here   │
+    │             │          └────────┬────────┘                      │
+    │             │                   │  checkpoint#5                  │
+    │             │                   │                                │
+    │             └───────────┬───────┘                                │
+    │                         │                                       │
+    │                         ▼                                       │
+    │               ┌──────────────────┐                              │
+    │               │  final_decision   │                             │
+    │               │  (format report)  │                             │
+    │               └────────┬─────────┘                              │
+    │                        │  checkpoint#6                          │
+    │                        ▼                                        │
+    │                    ┌───────┐                                    │
+    │                    │  END  │                                    │
+    │                    └───────┘                                    │
+    │                                                                 │
+    └─────────────────────────────────────────────────────────────────┘
+</pre></div>
+
+<h3>Key Points in the Diagram</h3>
+<ul>
+    <li><strong>checkpoint#1 through #6</strong> — State is saved to Redis AFTER each node completes. If the process crashes between any two nodes, it resumes from the last checkpoint.</li>
+    <li><strong>INTERRUPT</strong> — The state machine literally stops. The Python process can exit. Nothing is running. State lives in Redis.</li>
+    <li><strong>RESUME</strong> — A new process (possibly on a different server) loads state from Redis and continues from the interrupt point.</li>
+    <li><strong>The conditional edge</strong> (needs_manual_review?) is a Python function, not an LLM call. Zero cost, deterministic.</li>
+</ul>
+</div>
+
+<!-- TAB 2: CHECKPOINT STORAGE -->
+<div class="tab-content" id="tab1">
+<h2>What Each Checkpoint Stores</h2>
+
+<p><strong>Yes — every checkpoint stores the ENTIRE accumulated state up to that point.</strong> Each checkpoint is a complete snapshot that can independently resume the pipeline.</p>
+
+<div class="checkpoint-box">
+<h4>Checkpoint #1 (after fetch_data)</h4>
+<pre>
+{
+  "state": {
+    "app_id": "APP-001",
+    "borrower_package": {"name": "John", "fico": 710, "income": 95000, ...},  ← NEW
+    "document_review": null,        ← not yet populated
+    "risk_assessment": null,        ← not yet populated  
+    "compliance_result": null,      ← not yet populated
+    "final_decision": null,         ← not yet populated
+    "errors": []
+  },
+  "completed_nodes": ["fetch_data"],
+  "next_node": "risk_scoring"  (waiting for doc_review too)
+}
+</pre>
+</div>
+
+<div class="checkpoint-box">
+<h4>Checkpoint #2 (after doc_review)</h4>
+<pre>
+{
+  "state": {
+    "app_id": "APP-001",
+    "borrower_package": {"name": "John", "fico": 710, ...},     ← from checkpoint#1
+    "document_review": {"status": "COMPLETE", "extractions": [...]},  ← NEW
+    "risk_assessment": null,
+    "compliance_result": null,
+    "final_decision": null,
+    "errors": []
+  },
+  "completed_nodes": ["fetch_data", "doc_review"],
+  "next_node": "risk_scoring"
+}
+</pre>
+</div>
+
+<div class="checkpoint-box">
+<h4>Checkpoint #3 (after risk_scoring)</h4>
+<pre>
+{
+  "state": {
+    "app_id": "APP-001",
+    "borrower_package": {"name": "John", "fico": 710, ...},
+    "document_review": {"status": "COMPLETE", ...},
+    "risk_assessment": {"score": 46, "level": "HIGH",               ← NEW
+                        "recommendation": "MANUAL_REVIEW", ...},
+    "compliance_result": null,
+    "final_decision": null,
+    "errors": []
+  },
+  "completed_nodes": ["fetch_data", "doc_review", "risk_scoring"],
+  "next_node": "compliance"
+}
+</pre>
+</div>
+
+<div class="checkpoint-box">
+<h4>Checkpoint #4 (after compliance — INTERRUPTED)</h4>
+<pre>
+{
+  "state": {
+    "app_id": "APP-001",
+    "borrower_package": {"name": "John", "fico": 710, ...},
+    "document_review": {"status": "COMPLETE", ...},
+    "risk_assessment": {"score": 46, "recommendation": "MANUAL_REVIEW", ...},
+    "compliance_result": {"status": "COMPLIANT", "disclosures": [...]},  ← NEW
+    "needs_manual_review": true,
+    "final_decision": null,
+    "errors": []
+  },
+  "completed_nodes": ["fetch_data", "doc_review", "risk_scoring", "compliance"],
+  "current_node": "human_review",
+  "status": "INTERRUPTED",                    ← PAUSED HERE
+  "interrupt_value": "Senior review required..."
+}
+</pre>
+</div>
+
+<h3>Storage Size</h3>
+<table>
+    <tr><th>Checkpoint</th><th>Accumulated Data</th><th>Approx Size</th></tr>
+    <tr><td>#1 (after fetch)</td><td>borrower_package only</td><td>~2 KB</td></tr>
+    <tr><td>#2 (after doc_review)</td><td>#1 + document_review</td><td>~5 KB</td></tr>
+    <tr><td>#3 (after risk)</td><td>#1 + #2 + risk_assessment</td><td>~8 KB</td></tr>
+    <tr><td>#4 (after compliance)</td><td>#1 + #2 + #3 + compliance</td><td>~10 KB</td></tr>
+    <tr><td>Total per evaluation</td><td>4-6 checkpoints</td><td>~30-50 KB</td></tr>
+    <tr><td>1,000 evaluations/day</td><td>4,000-6,000 checkpoints</td><td>~30-50 MB</td></tr>
+</table>
+<p>Redis handles this trivially. Even 50 MB/day with 7-day TTL = 350 MB. Redis default memory is 1+ GB.</p>
+</div>
+
+<!-- TAB 3: INTERRUPT/RESUME CYCLE -->
+<div class="tab-content" id="tab2">
+<h2>The Complete Interrupt/Resume Lifecycle</h2>
+
+<p>Follow the numbered steps to see exactly what happens from start to finish.</p>
+
+<div class="step">
+    <span class="step-number">STEP 1:</span>
+    <strong>Your API receives evaluation request</strong><br>
+    POST /api/evaluate {"app_id": "APP-001", "documents": ["w2.png"]}
+</div>
+<div class="flow-arrow">▼</div>
+
+<div class="step">
+    <span class="step-number">STEP 2:</span>
+    <strong>API starts the graph</strong><br>
+    config = {"configurable": {"thread_id": "APP-001"}}<br>
+    result = app.invoke(initial_state, config)
+</div>
+<div class="flow-arrow">▼</div>
+
+<div class="step">
+    <span class="step-number">STEP 3:</span>
+    <strong>Graph runs: fetch_data → doc_review → risk_scoring → compliance</strong><br>
+    Each node executes, checkpoints saved to Redis after each.<br>
+    Risk scoring returns: MANUAL_REVIEW (score 46/100)
+</div>
+<div class="flow-arrow">▼</div>
+
+<div class="step">
+    <span class="step-number">STEP 4:</span>
+    <strong>Conditional edge routes to human_review</strong><br>
+    needs_manual_review = True → route to human_review node
+</div>
+<div class="flow-arrow">▼</div>
+
+<div class="step step-interrupt">
+    <span class="step-number">STEP 5: ██ INTERRUPT ██</span>
+    <strong>human_review_node calls interrupt()</strong><br>
+    • Full state serialized to Redis (checkpoint #4)<br>
+    • Graph invocation RETURNS with interrupt value<br>
+    • Python process is FREE — nothing waiting, nothing blocking<br>
+    • API returns: {"status": "PENDING_REVIEW", "thread_id": "APP-001", "message": "Senior review required..."}
+</div>
+<div class="flow-arrow" style="font-size: 30px; color: #f44336;">▼ ⏸️ PAUSED ⏸️ ▼</div>
+
+<div class="redis-box">
+    <h4>🔴 Redis holds the state — nothing else is running</h4>
+    <pre>
+Key:   checkpoint:APP-001
+Value: {full state with all 4 agent outputs}
+TTL:   7 days
+
+The API server can restart.
+New code can be deployed.
+Servers can scale up/down.
+The checkpoint persists independently.
+    </pre>
+</div>
+
+<div class="flow-arrow" style="font-size: 30px; color: #ff9800;">⏳ Hours or days pass ⏳</div>
+
+<div class="step step-resume">
+    <span class="step-number">STEP 6:</span>
+    <strong>Human reviews in Camelot UI</strong><br>
+    UI calls: GET /api/pending-reviews → shows all interrupted evaluations<br>
+    Underwriter reads the risk assessment, compliance result, borrower data
+</div>
+<div class="flow-arrow">▼</div>
+
+<div class="step step-resume">
+    <span class="step-number">STEP 7:</span>
+    <strong>Human submits decision</strong><br>
+    POST /api/reviews/APP-001/decision<br>
+    {"decision": "APPROVED_WITH_CONDITIONS", "conditions": "Require 6 months reserves"}
+</div>
+<div class="flow-arrow">▼</div>
+
+<div class="step step-resume">
+    <span class="step-number">STEP 8: ██ RESUME ██</span>
+    <strong>API resumes the graph</strong><br>
+    • Same thread_id: config = {"configurable": {"thread_id": "APP-001"}}<br>
+    • LangGraph loads checkpoint from Redis<br>
+    • Reconstructs FULL state (all 4 agent outputs)<br>
+    • Injects human's response as the return value of interrupt()<br>
+    • Execution continues from human_review_node
+</div>
+<div class="flow-arrow">▼</div>
+
+<div class="step">
+    <span class="step-number">STEP 9:</span>
+    <strong>human_review_node completes</strong><br>
+    Writes human decision to state: final_decision = "APPROVED_WITH_CONDITIONS..."<br>
+    Execution continues to final_decision_node
+</div>
+<div class="flow-arrow">▼</div>
+
+<div class="step">
+    <span class="step-number">STEP 10:</span>
+    <strong>final_decision_node produces complete report</strong><br>
+    Combines: automated assessment + human override + full audit trail<br>
+    Graph reaches END. Result persisted to DocumentDB.
+</div>
+
+<div class="answer-box">
+    <h4>✅ Final Output</h4>
+    <pre>
+UNDERWRITING DECISION: APPROVED WITH CONDITIONS
+
+Automated Assessment: MANUAL_REVIEW (Score 46/100, HIGH risk)
+  - FICO 710: GOOD (above 680 minimum)
+  - DTI 40.4%: BORDERLINE (below 43% but above 38%)
+  - LTV 84.9%: EXCEEDS Texas 80% limit — VIOLATION
+  - Industry: Cryptocurrency, 8% default rate
+
+Compliance: COMPLIANT (no additional violations beyond LTV)
+
+Human Review: APPROVED WITH CONDITIONS
+  Reviewer: Senior Underwriter Jane Smith
+  Decision: Approve subject to:
+    1. Borrower must provide 6 months cash reserves documentation
+    2. Loan must be restructured to meet 80% Texas LTV limit
+  Date: 2026-03-29
+
+Audit Trail: [complete tool call history from all 4 agents]
+    </pre>
+</div>
+</div>
+
+<!-- TAB 4: YOUR QUESTIONS -->
+<div class="tab-content" id="tab3">
+<h2>Your Questions Answered</h2>
+
+<div class="answer-box">
+<h4>Q: Does every checkpoint store the WHOLE context?</h4>
+<p><strong>Yes.</strong> Each checkpoint is a complete snapshot. Checkpoint #3 (after risk_scoring) contains EVERYTHING from fetch_data, doc_review, AND risk_scoring. It is self-contained — you can resume from checkpoint #3 without needing checkpoints #1 or #2.</p>
+<p>This is intentional. If checkpoint #3 only stored the DELTA (just risk_scoring's output), then resuming would require loading and replaying checkpoints #1, #2, and #3 in sequence. That is slower and more fragile. Full snapshots mean instant resume from any point.</p>
+<p>The tradeoff is storage: each checkpoint duplicates earlier data. But at ~10 KB per checkpoint, this is negligible. Storage is cheap; resume speed and reliability are valuable.</p>
+</div>
+
+<div class="answer-box">
+<h4>Q: If I need to run the whole flow again, do I store ALL context of ALL agents?</h4>
+<p><strong>If you restart from scratch:</strong> No stored context needed. You invoke the graph with fresh initial state (just app_id and document_paths). Each node runs and builds up state from nothing.</p>
+<p><strong>If you resume from a failure:</strong> The checkpoint has everything. Load checkpoint, continue from the failed node. Previous nodes' outputs are in the checkpoint.</p>
+<p><strong>If you resume from human review:</strong> The checkpoint has all 4 agents' outputs. Load it, inject the human's decision, continue to final_decision. No agent re-runs.</p>
+</div>
+
+<div class="answer-box">
+<h4>Q: The interrupt pauses the state machine — can you show a workflow diagram?</h4>
+<p><strong>See Tab 1</strong> for the state machine diagram with the interrupt point marked.</p>
+<p><strong>See Tab 3</strong> for the step-by-step lifecycle showing exactly when the pause happens, what gets saved, and how resume works.</p>
+<p>The key insight: the interrupt is NOT a sleeping thread or a waiting process. The state machine literally STOPS. The process exits. State is persisted externally (Redis). A completely new process can resume it later.</p>
+</div>
+
+<div class="answer-box">
+<h4>Q: When the human returns, how does LangGraph know this is a response and find the right chain?</h4>
+<p><strong>The thread_id is the key.</strong> Here is the exact mechanism:</p>
+<ol>
+    <li><strong>On interrupt:</strong> Your API stores the thread_id (e.g., "APP-001") alongside the interrupt message. Your database knows: thread_id "APP-001" is pending human review.</li>
+    <li><strong>Human responds:</strong> The human submits their decision through your UI/API. Your API knows this is for thread_id "APP-001" because the review was linked to that thread_id.</li>
+    <li><strong>On resume:</strong> Your API calls app.invoke(Command(resume="human's decision"), config={"configurable": {"thread_id": "APP-001"}})</li>
+    <li><strong>LangGraph sees thread_id "APP-001"</strong> → looks it up in the checkpoint store (Redis) → finds the interrupted checkpoint → loads the full state → knows execution was paused at human_review_node → injects the resume value as the return of interrupt() → continues execution.</li>
+</ol>
+<p>LangGraph does NOT "understand" that this is a human response. It simply sees: "thread APP-001 has a checkpoint in interrupted state. The caller provided a resume value. Inject that value and continue." The semantic meaning (human review) is YOUR application logic. LangGraph just handles the pause/persist/resume mechanics.</p>
+</div>
+
+<div class="answer-box">
+<h4>Q: What is the thread_id exactly?</h4>
+<p>It is a string YOU choose. For your underwriting system, use the application ID: "APP-001", "APP-002", etc. It serves the same purpose as a Step Functions execution ARN — uniquely identifies one pipeline execution.</p>
+<p>Multiple concurrent evaluations each have their own thread_id and their own checkpoint chain. They do not interfere with each other.</p>
+</div>
+
+<div class="answer-box">
+<h4>Q: What if two processes try to resume the same thread_id?</h4>
+<p>The checkpoint store should use optimistic locking. When Process A loads the checkpoint to resume, it notes the checkpoint version. When it tries to write the next checkpoint, it checks the version hasn't changed. If Process B already resumed and advanced the checkpoint, Process A's write fails and it knows to abort.</p>
+<p>In practice, your API should ensure only one resume call per thread_id. The pending review queue in Camelot UI should show "APP-001: pending review" and once a reviewer claims it, others see "APP-001: under review by Jane Smith."</p>
+</div>
+
+</div>
+
+</div>
+
+<script>
+function showTab(idx) {
+    document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', i===idx));
+    document.querySelectorAll('.tab-content').forEach((t,i) => t.classList.toggle('active', i===idx));
+}
+</script>
+</body>
+</html>
+"""
+
+with open("Week4_Day4_Human_in_Loop.html", "w") as f:
+    f.write(html_content)
+
+print(f"✅ Interactive HTML diagram created: {len(html_content)} chars")
+print("Open Week4_Day4_Human_in_Loop.html in your browser")
+print("4 tabs: State Machine Flow, Checkpoint Storage, Interrupt/Resume Cycle, Your Questions")

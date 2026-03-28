@@ -1,0 +1,822 @@
+html_content = """<!DOCTYPE html>
+<html>
+<head>
+<style>
+    body { font-family: Calibri, sans-serif; margin: 20px; background: #f5f5f5; }
+    .container { max-width: 1300px; margin: 0 auto; }
+    h1 { text-align: center; color: #1a1a2e; margin-bottom: 5px; }
+    h2 { color: #16213e; border-bottom: 2px solid #0f3460; padding-bottom: 5px; }
+    h3 { color: #0f3460; }
+    
+    .tabs { display: flex; gap: 3px; margin-bottom: 0; flex-wrap: wrap; }
+    .tab { padding: 10px 16px; background: #ddd; border: none; cursor: pointer;
+           border-radius: 8px 8px 0 0; font-size: 13px; font-weight: bold; }
+    .tab.active { background: #fff; }
+    .tab-content { display: none; background: #fff; padding: 25px; border-radius: 0 8px 8px 8px;
+                   box-shadow: 0 2px 8px rgba(0,0,0,0.1); min-height: 600px; }
+    .tab-content.active { display: block; }
+    
+    .diagram { background: #1a1a2e; color: #e0e0e0; border-radius: 8px;
+               padding: 20px; margin: 15px 0; overflow-x: auto; }
+    .diagram pre { font-family: 'Courier New', monospace; font-size: 12px; line-height: 1.6; margin: 0; }
+    .diagram .green { color: #4CAF50; }
+    .diagram .blue { color: #64B5F6; }
+    .diagram .orange { color: #FFB74D; }
+    .diagram .red { color: #EF5350; }
+    .diagram .yellow { color: #FFF176; }
+    .diagram .cyan { color: #4DD0E1; }
+    .diagram .purple { color: #CE93D8; }
+    .diagram .white { color: #ffffff; font-weight: bold; }
+    
+    .box { border-radius: 8px; padding: 15px; margin: 10px 0; }
+    .box-green { background: #e8f5e9; border: 2px solid #4CAF50; }
+    .box-blue { background: #e3f2fd; border: 2px solid #2196F3; }
+    .box-orange { background: #fff3e0; border: 2px solid #FF9800; }
+    .box-red { background: #fce4ec; border: 2px solid #e91e63; }
+    .box-purple { background: #f3e5f5; border: 2px solid #9C27B0; }
+    .box-gray { background: #f5f5f5; border: 2px solid #9E9E9E; }
+    .box h4 { margin: 0 0 8px 0; }
+    
+    .flow-arrow { text-align: center; font-size: 24px; color: #666; margin: 5px 0; }
+    
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+    .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; }
+    
+    table { width: 100%; border-collapse: collapse; margin: 15px 0; }
+    th { background: #1a1a2e; color: white; padding: 10px; text-align: left; font-size: 13px; }
+    td { padding: 8px 10px; border-bottom: 1px solid #eee; font-size: 13px; }
+    tr:hover { background: #f5f5f5; }
+    
+    .timeline { position: relative; padding-left: 30px; }
+    .timeline::before { content: ''; position: absolute; left: 10px; top: 0; bottom: 0;
+                        width: 3px; background: #2196F3; }
+    .timeline-item { position: relative; margin: 15px 0; padding: 10px 15px;
+                     background: white; border-radius: 6px; border: 1px solid #ddd; }
+    .timeline-item::before { content: ''; position: absolute; left: -25px; top: 15px;
+                             width: 12px; height: 12px; border-radius: 50%; background: #2196F3; }
+    .timeline-item.interrupt::before { background: #f44336; }
+    .timeline-item.resume::before { background: #4CAF50; }
+    .timeline-item .time { font-size: 11px; color: #999; }
+    .timeline-item .action { font-weight: bold; }
+    
+    .warning { background: #fff8e1; border-left: 4px solid #ffc107; padding: 12px 15px;
+               margin: 10px 0; border-radius: 0 6px 6px 0; }
+    .danger { background: #fce4ec; border-left: 4px solid #f44336; padding: 12px 15px;
+              margin: 10px 0; border-radius: 0 6px 6px 0; }
+    .success { background: #e8f5e9; border-left: 4px solid #4CAF50; padding: 12px 15px;
+               margin: 10px 0; border-radius: 0 6px 6px 0; }
+</style>
+</head>
+<body>
+<div class="container">
+<h1>Human-in-the-Loop: Complete Production Lifecycle</h1>
+<p style="text-align:center; color:#666;">From UI click to final decision — every step, every data flow, every edge case</p>
+
+<div class="tabs">
+    <button class="tab active" onclick="showTab(0)">1. Full Data Flow</button>
+    <button class="tab" onclick="showTab(1)">2. UI → API → Agent</button>
+    <button class="tab" onclick="showTab(2)">3. Interrupt & Resume</button>
+    <button class="tab" onclick="showTab(3)">4. Redeployment Problem</button>
+    <button class="tab" onclick="showTab(4)">5. State in Redis</button>
+    <button class="tab" onclick="showTab(5)">6. Q&A</button>
+</div>
+
+<!-- TAB 1: FULL DATA FLOW -->
+<div class="tab-content active" id="tab0">
+<h2>Complete Data Flow: UI → API → Agents → Redis → Human → Resume</h2>
+
+<div class="diagram"><pre>
+<span class="white">PHASE 1: USER INITIATES EVALUATION</span>
+
+  <span class="cyan">┌─────────────────────────────────────────────────────────────────────┐</span>
+  <span class="cyan">│  CAMELOT UI (Browser)                                               │</span>
+  <span class="cyan">│                                                                     │</span>
+  <span class="cyan">│  Underwriter clicks "Evaluate Loan"                                │</span>
+  <span class="cyan">│  Enters: Application ID = APP-001                                  │</span>
+  <span class="cyan">│  Uploads: w2.png, paystub.png                                      │</span>
+  <span class="cyan">│  Clicks: [Submit for Evaluation]                                   │</span>
+  <span class="cyan">└──────────────────────────┬──────────────────────────────────────────┘</span>
+                              │
+                    <span class="yellow">POST /api/evaluate</span>
+                    <span class="yellow">{ "app_id": "APP-001",</span>
+                    <span class="yellow">  "documents": ["w2.png", "paystub.png"] }</span>
+                              │
+                              ▼
+  <span class="blue">┌─────────────────────────────────────────────────────────────────────┐</span>
+  <span class="blue">│  FASTAPI SERVICE (ECS Fargate)                                      │</span>
+  <span class="blue">│                                                                     │</span>
+  <span class="blue">│  1. Receives request                                               │</span>
+  <span class="blue">│  2. Creates config = {"configurable": {"thread_id": "APP-001"}}     │</span>
+  <span class="blue">│  3. Creates initial_state = {                                      │</span>
+  <span class="blue">│       "app_id": "APP-001",                                         │</span>
+  <span class="blue">│       "document_paths": ["s3://bucket/w2.png", "s3://..."],         │</span>
+  <span class="blue">│       "errors": []                                                 │</span>
+  <span class="blue">│     }                                                              │</span>
+  <span class="blue">│  4. Calls: result = graph_app.invoke(initial_state, config)         │</span>
+  <span class="blue">└──────────────────────────┬──────────────────────────────────────────┘</span>
+                              │
+                              ▼
+<span class="white">PHASE 2: AGENTS EXECUTE (all in same process)</span>
+
+  <span class="green">┌─────────────────────────────────────────────────────────────────────┐</span>
+  <span class="green">│  LANGGRAPH ENGINE (in-process)                                      │</span>
+  <span class="green">│                                                                     │</span>
+  <span class="green">│  State = { app_id: "APP-001", document_paths: [...], errors: [] }   │</span>
+  <span class="green">│                                                                     │</span>
+  <span class="green">│  ┌────────────┐    ┌─────────────┐                                  │</span>
+  <span class="green">│  │ fetch_data  │    │ doc_review   │   ◄── PARALLEL (asyncio)        │</span>
+  <span class="green">│  │   (Haiku)   │    │  (Sonnet)    │                                  │</span>
+  <span class="green">│  │             │    │              │                                  │</span>
+  <span class="green">│  │ Calls:      │    │ Calls:       │                                  │</span>
+  <span class="green">│  │  Bedrock API│    │  Bedrock API │   ◄── LLM calls go to AWS        │</span>
+  <span class="green">│  │  Credit API │    │  (vision)    │                                  │</span>
+  <span class="green">│  │  Employ API │    │              │                                  │</span>
+  <span class="green">│  └─────┬──────┘    └──────┬───────┘                                  │</span>
+  <span class="green">│        │ checkpoint#1     │ checkpoint#2    ◄── State → Redis         │</span>
+  <span class="green">│        └────────┬─────────┘                                          │</span>
+  <span class="green">│                 ▼                                                     │</span>
+  <span class="green">│        ┌──────────────┐                                              │</span>
+  <span class="green">│        │ risk_scoring  │   Calls: Bedrock, Neo4j, FAISS              │</span>
+  <span class="green">│        │   (Haiku)     │   Returns: score=46, MANUAL_REVIEW          │</span>
+  <span class="green">│        └──────┬───────┘                                              │</span>
+  <span class="green">│               │ checkpoint#3                                         │</span>
+  <span class="green">│               ▼                                                      │</span>
+  <span class="green">│        ┌──────────────┐                                              │</span>
+  <span class="green">│        │  compliance   │   Calls: Bedrock (Sonnet), FAISS            │</span>
+  <span class="green">│        │   (Sonnet)    │   Returns: COMPLIANT, disclosures needed    │</span>
+  <span class="green">│        └──────┬───────┘                                              │</span>
+  <span class="green">│               │ checkpoint#4                                         │</span>
+  <span class="green">│               ▼                                                      │</span>
+  <span class="green">│     needs_manual_review = True                                       │</span>
+  <span class="green">│               │                                                      │</span>
+  <span class="green">│               ▼                                                      │</span>
+  <span class="green">│        ┌──────────────┐                                              │</span>
+  <span class="red">│        │ human_review  │                                              │</span>
+  <span class="red">│        │              │                                              │</span>
+  <span class="red">│        │ interrupt()  │  ◄── ██ STATE MACHINE STOPS HERE ██           │</span>
+  <span class="red">│        │              │                                              │</span>
+  <span class="green">│        └──────────────┘                                              │</span>
+  <span class="green">│                                                                     │</span>
+  <span class="green">│  State serialized to Redis (checkpoint#5, status=INTERRUPTED)        │</span>
+  <span class="green">│  graph_app.invoke() RETURNS with interrupt value                    │</span>
+  <span class="green">└──────────────────────────┬──────────────────────────────────────────┘</span>
+                              │
+                    <span class="orange">Returns to FastAPI:</span>
+                    <span class="orange">{ "status": "PENDING_REVIEW",</span>
+                    <span class="orange">  "thread_id": "APP-001",</span>
+                    <span class="orange">  "review_message": "Senior review required..." }</span>
+                              │
+                              ▼
+  <span class="blue">┌─────────────────────────────────────────────────────────────────────┐</span>
+  <span class="blue">│  FASTAPI SERVICE                                                    │</span>
+  <span class="blue">│                                                                     │</span>
+  <span class="blue">│  5. Saves to DocumentDB: {                                          │</span>
+  <span class="blue">│       app_id: "APP-001",                                            │</span>
+  <span class="blue">│       status: "PENDING_REVIEW",                                     │</span>
+  <span class="blue">│       thread_id: "APP-001",                                         │</span>
+  <span class="blue">│       review_summary: "Senior review required...",                   │</span>
+  <span class="blue">│       risk_score: 46,                                               │</span>
+  <span class="blue">│       assigned_to: null                                             │</span>
+  <span class="blue">│     }                                                               │</span>
+  <span class="blue">│  6. Returns HTTP 202 Accepted to UI                                 │</span>
+  <span class="blue">└──────────────────────────┬──────────────────────────────────────────┘</span>
+                              │
+                    <span class="yellow">HTTP 202: { "status": "PENDING_REVIEW",</span>
+                    <span class="yellow">            "message": "Sent to senior review queue" }</span>
+                              │
+                              ▼
+  <span class="cyan">┌─────────────────────────────────────────────────────────────────────┐</span>
+  <span class="cyan">│  CAMELOT UI                                                         │</span>
+  <span class="cyan">│                                                                     │</span>
+  <span class="cyan">│  Shows: "Application APP-001 sent to senior review"                 │</span>
+  <span class="cyan">│  Status badge: 🟠 PENDING REVIEW                                    │</span>
+  <span class="cyan">└─────────────────────────────────────────────────────────────────────┘</span>
+
+<span class="red">═══════════════════════════════════════════════════════════════════════</span>
+<span class="red">  AT THIS POINT: No process is running. No thread is waiting.</span>
+<span class="red">  State lives ONLY in Redis. The Fargate task can be replaced.</span>
+<span class="red">═══════════════════════════════════════════════════════════════════════</span>
+
+<span class="white">PHASE 3: HUMAN REVIEWS AND RESPONDS (hours/days later)</span>
+
+  <span class="cyan">┌─────────────────────────────────────────────────────────────────────┐</span>
+  <span class="cyan">│  CAMELOT UI — Senior Underwriter Dashboard                          │</span>
+  <span class="cyan">│                                                                     │</span>
+  <span class="cyan">│  Review Queue:                                                      │</span>
+  <span class="cyan">│  ┌──────────────────────────────────────────────────────────┐        │</span>
+  <span class="cyan">│  │ APP-001 │ Score: 46 │ Risk: HIGH │ FICO: 710 │ Crypto  │        │</span>
+  <span class="cyan">│  │ APP-007 │ Score: 55 │ Risk: HIGH │ FICO: 690 │ Retail  │        │</span>
+  <span class="cyan">│  └──────────────────────────────────────────────────────────┘        │</span>
+  <span class="cyan">│                                                                     │</span>
+  <span class="cyan">│  Clicks APP-001 → Sees full assessment:                             │</span>
+  <span class="cyan">│    Risk Score: 46/100                                               │</span>
+  <span class="cyan">│    FICO: 710 (GOOD), DTI: 40.4% (BORDERLINE)                       │</span>
+  <span class="cyan">│    LTV: 84.9% (EXCEEDS TX 80% LIMIT)                               │</span>
+  <span class="cyan">│    Industry: Cryptocurrency (8% default rate)                       │</span>
+  <span class="cyan">│    Compliance: COMPLIANT                                            │</span>
+  <span class="cyan">│                                                                     │</span>
+  <span class="cyan">│  Decision: [APPROVE ▼] with conditions:                             │</span>
+  <span class="cyan">│  "Require 6 months reserves. Restructure to 80% LTV."              │</span>
+  <span class="cyan">│  [Submit Decision]                                                  │</span>
+  <span class="cyan">└──────────────────────────┬──────────────────────────────────────────┘</span>
+                              │
+                    <span class="yellow">POST /api/reviews/APP-001/decision</span>
+                    <span class="yellow">{ "decision": "APPROVE_WITH_CONDITIONS",</span>
+                    <span class="yellow">  "conditions": "6 months reserves, restructure to 80% LTV",</span>
+                    <span class="yellow">  "reviewer": "Jane Smith" }</span>
+                              │
+                              ▼
+  <span class="blue">┌─────────────────────────────────────────────────────────────────────┐</span>
+  <span class="blue">│  FASTAPI SERVICE (possibly DIFFERENT Fargate task than Phase 1!)    │</span>
+  <span class="blue">│                                                                     │</span>
+  <span class="blue">│  7. Receives human decision                                        │</span>
+  <span class="blue">│  8. Formats resume value: "APPROVE_WITH_CONDITIONS: 6 months..."    │</span>
+  <span class="blue">│  9. Calls: result = graph_app.invoke(                               │</span>
+  <span class="blue">│       Command(resume="APPROVE_WITH_CONDITIONS: 6 months..."),       │</span>
+  <span class="blue">│       config={"configurable": {"thread_id": "APP-001"}}             │</span>
+  <span class="blue">│     )                                                               │</span>
+  <span class="blue">└──────────────────────────┬──────────────────────────────────────────┘</span>
+                              │
+                              ▼
+<span class="white">PHASE 4: GRAPH RESUMES</span>
+
+  <span class="green">┌─────────────────────────────────────────────────────────────────────┐</span>
+  <span class="green">│  LANGGRAPH ENGINE                                                   │</span>
+  <span class="green">│                                                                     │</span>
+  <span class="green">│  10. Sees thread_id "APP-001"                                      │</span>
+  <span class="green">│  11. Loads checkpoint#5 from Redis                                 │</span>
+  <span class="green">│  12. Reconstructs FULL state:                                      │</span>
+  <span class="green">│      - borrower_package (from fetch_data)        ✓ restored         │</span>
+  <span class="green">│      - document_review (from doc_review)          ✓ restored         │</span>
+  <span class="green">│      - risk_assessment (from risk_scoring)        ✓ restored         │</span>
+  <span class="green">│      - compliance_result (from compliance)        ✓ restored         │</span>
+  <span class="green">│  13. Injects resume value as return of interrupt()                 │</span>
+  <span class="green">│  14. human_review_node CONTINUES from where it paused              │</span>
+  <span class="green">│                                                                     │</span>
+  <span class="green">│      human_review_node completes → writes final_decision to state   │</span>
+  <span class="green">│               │ checkpoint#6                                        │</span>
+  <span class="green">│               ▼                                                     │</span>
+  <span class="green">│      final_decision_node runs → formats complete report             │</span>
+  <span class="green">│               │ checkpoint#7                                        │</span>
+  <span class="green">│               ▼                                                     │</span>
+  <span class="green">│             END                                                     │</span>
+  <span class="green">│                                                                     │</span>
+  <span class="green">│  Returns: complete result with all agent outputs + human decision   │</span>
+  <span class="green">└──────────────────────────┬──────────────────────────────────────────┘</span>
+                              │
+                              ▼
+  <span class="blue">┌─────────────────────────────────────────────────────────────────────┐</span>
+  <span class="blue">│  FASTAPI SERVICE                                                    │</span>
+  <span class="blue">│                                                                     │</span>
+  <span class="blue">│  15. Persists final result to DocumentDB                            │</span>
+  <span class="blue">│  16. Cleans up Redis checkpoint (or lets TTL expire)                │</span>
+  <span class="blue">│  17. Returns HTTP 200 with final decision                           │</span>
+  <span class="blue">└──────────────────────────┬──────────────────────────────────────────┘</span>
+                              │
+                              ▼
+  <span class="cyan">┌─────────────────────────────────────────────────────────────────────┐</span>
+  <span class="cyan">│  CAMELOT UI                                                         │</span>
+  <span class="cyan">│                                                                     │</span>
+  <span class="cyan">│  Status: ✅ APPROVED WITH CONDITIONS                                │</span>
+  <span class="cyan">│  Shows complete report with automated + human decision               │</span>
+  <span class="cyan">└─────────────────────────────────────────────────────────────────────┘</span>
+</pre></div>
+</div>
+
+<!-- TAB 2: UI TO API TO AGENT -->
+<div class="tab-content" id="tab1">
+<h2>The Three API Endpoints</h2>
+
+<div class="grid3">
+    <div class="box box-green">
+        <h4>POST /api/evaluate</h4>
+        <p><strong>Who calls it:</strong> Camelot UI when underwriter clicks "Evaluate"</p>
+        <p><strong>Input:</strong></p>
+        <pre>{ 
+  "app_id": "APP-001",
+  "documents": ["w2.png", "paystub.png"]
+}</pre>
+        <p><strong>What happens:</strong></p>
+        <ol>
+            <li>Upload docs to S3</li>
+            <li>Create thread_id = app_id</li>
+            <li>Start graph with initial state</li>
+            <li>Graph runs all agents</li>
+        </ol>
+        <p><strong>Output (if completes):</strong></p>
+        <pre>HTTP 200
+{ "status": "APPROVED",
+  "score": 85,
+  "report": "..." }</pre>
+        <p><strong>Output (if interrupted):</strong></p>
+        <pre>HTTP 202
+{ "status": "PENDING_REVIEW",
+  "thread_id": "APP-001",
+  "review_summary": "..." }</pre>
+    </div>
+
+    <div class="box box-orange">
+        <h4>GET /api/pending-reviews</h4>
+        <p><strong>Who calls it:</strong> Senior underwriter dashboard (polling or websocket)</p>
+        <p><strong>Input:</strong> None (or filter by reviewer)</p>
+        <p><strong>What happens:</strong></p>
+        <ol>
+            <li>Query DocumentDB for status = "PENDING_REVIEW"</li>
+            <li>Return list with summaries</li>
+        </ol>
+        <p><strong>Output:</strong></p>
+        <pre>HTTP 200
+[{ "app_id": "APP-001",
+   "score": 46,
+   "risk": "HIGH",
+   "summary": "FICO 710, DTI 40%...",
+   "waiting_since": "2h ago" },
+ { "app_id": "APP-007", ... }]</pre>
+    </div>
+
+    <div class="box box-blue">
+        <h4>POST /api/reviews/{id}/decision</h4>
+        <p><strong>Who calls it:</strong> Senior underwriter after reviewing</p>
+        <p><strong>Input:</strong></p>
+        <pre>{
+  "decision": "APPROVE_WITH_CONDITIONS",
+  "conditions": "6 months reserves",
+  "reviewer": "Jane Smith"
+}</pre>
+        <p><strong>What happens:</strong></p>
+        <ol>
+            <li>Format resume value from human input</li>
+            <li>Call graph_app.invoke(Command(resume=...), config with thread_id)</li>
+            <li>LangGraph loads checkpoint from Redis</li>
+            <li>Graph resumes and completes</li>
+            <li>Persist final result to DocumentDB</li>
+        </ol>
+        <p><strong>Output:</strong></p>
+        <pre>HTTP 200
+{ "status": "APPROVED_WITH_CONDITIONS",
+  "final_report": "...",
+  "audit_trail": "..." }</pre>
+    </div>
+</div>
+
+<h3>Data Flow Between Components</h3>
+<div class="diagram"><pre>
+<span class="white">WHO STORES WHAT:</span>
+
+<span class="cyan">DocumentDB (permanent):</span>
+  ├── Loan application record (app_id, borrower, loan details)
+  ├── Evaluation status (PENDING_REVIEW / APPROVED / DENIED)
+  ├── Review assignment (assigned_to, claimed_at)
+  ├── Final decision (human + automated)
+  └── Complete audit trail (all agent outputs, tool calls, timing)
+
+<span class="red">Redis (temporary, TTL 7 days):</span>
+  ├── Checkpoint: thread_id → serialized LangGraph state
+  │   Contains: ALL agent outputs (borrower_package, doc_review,
+  │   risk_assessment, compliance_result, errors)
+  └── Purpose: crash recovery + interrupt/resume
+
+<span class="blue">S3 (permanent):</span>
+  ├── Uploaded documents (w2.png, paystub.png)
+  ├── Extracted document data (JSON)
+  └── Generated reports (PDF)
+
+<span class="green">Neo4j (permanent):</span>
+  ├── Borrower → Employer → Industry relationships
+  ├── Historical loan outcomes
+  └── Updated after each evaluation completes
+
+<span class="orange">FAISS / OpenSearch (permanent):</span>
+  ├── Policy document embeddings
+  └── Regulatory text chunks with metadata
+
+<span class="white">KEY INSIGHT: Redis checkpoint is the ONLY component needed for resume.</span>
+<span class="white">DocumentDB status is for the UI. S3 is for documents. Neo4j is for context.</span>
+<span class="white">But the graph only needs Redis to resume from where it paused.</span>
+</pre></div>
+</div>
+
+<!-- TAB 3: INTERRUPT AND RESUME DETAIL -->
+<div class="tab-content" id="tab2">
+<h2>Interrupt & Resume: Exact Mechanics</h2>
+
+<h3>What Your Code Looks Like</h3>
+
+<div class="box box-green">
+<h4>FastAPI Endpoint: Start Evaluation</h4>
+<pre>
+@app.post("/api/evaluate")
+async def evaluate_loan(request: EvaluateRequest):
+    
+    config = {"configurable": {"thread_id": request.app_id}}
+    initial_state = {
+        "app_id": request.app_id,
+        "document_paths": upload_to_s3(request.documents),
+        "errors": [],
+    }
+    
+    # Start the graph
+    result = graph_app.invoke(initial_state, config)
+    
+    # Check if graph completed or interrupted
+    # LangGraph returns different structures for each case
+    
+    if is_interrupted(result):
+        # Graph paused at human_review
+        interrupt_msg = get_interrupt_value(result)
+        
+        # Save status to DocumentDB for UI
+        save_pending_review(request.app_id, interrupt_msg)
+        
+        return {"status": "PENDING_REVIEW", 
+                "thread_id": request.app_id,
+                "review_summary": interrupt_msg}
+    else:
+        # Graph completed fully (no manual review needed)
+        save_final_decision(request.app_id, result)
+        
+        return {"status": result["final_decision"]}
+</pre>
+</div>
+
+<div class="box box-blue">
+<h4>FastAPI Endpoint: Submit Human Decision</h4>
+<pre>
+@app.post("/api/reviews/{app_id}/decision")
+async def submit_review(app_id: str, decision: ReviewDecision):
+    
+    # Format the human's input as a string for the graph
+    resume_value = (
+        f"{decision.decision}: {decision.conditions}\n"
+        f"Reviewer: {decision.reviewer}"
+    )
+    
+    # Resume the graph with SAME thread_id
+    config = {"configurable": {"thread_id": app_id}}
+    
+    result = graph_app.invoke(
+        Command(resume=resume_value),
+        config,
+    )
+    
+    # Graph is now complete
+    save_final_decision(app_id, result)
+    cleanup_pending_review(app_id)
+    
+    return {"status": "COMPLETE", "final_report": result["final_decision"]}
+</pre>
+</div>
+
+<h3>Inside LangGraph: What Happens on Resume</h3>
+
+<div class="timeline">
+    <div class="timeline-item resume">
+        <div class="time">Step 1</div>
+        <div class="action">graph_app.invoke(Command(resume=...), config) called</div>
+        <div>LangGraph reads thread_id "APP-001" from config</div>
+    </div>
+    <div class="timeline-item resume">
+        <div class="time">Step 2</div>
+        <div class="action">Checkpoint store queried</div>
+        <div>Redis GET checkpoint:APP-001 → returns serialized state + metadata</div>
+    </div>
+    <div class="timeline-item resume">
+        <div class="time">Step 3</div>
+        <div class="action">State deserialized</div>
+        <div>Full TypedDict reconstructed: borrower_package, document_review, risk_assessment, compliance_result — all restored to in-memory Python objects</div>
+    </div>
+    <div class="timeline-item resume">
+        <div class="time">Step 4</div>
+        <div class="action">Execution position identified</div>
+        <div>Metadata says: "interrupted at human_review_node, waiting for interrupt() return value"</div>
+    </div>
+    <div class="timeline-item resume">
+        <div class="time">Step 5</div>
+        <div class="action">Resume value injected</div>
+        <div>The Command.resume string becomes the return value of the interrupt() call inside human_review_node</div>
+    </div>
+    <div class="timeline-item">
+        <div class="time">Step 6</div>
+        <div class="action">human_review_node continues</div>
+        <div>Code after interrupt() executes. Writes human decision to state. Node returns.</div>
+    </div>
+    <div class="timeline-item">
+        <div class="time">Step 7</div>
+        <div class="action">final_decision_node executes</div>
+        <div>Reads ALL state: automated assessment + human decision. Produces complete report.</div>
+    </div>
+    <div class="timeline-item">
+        <div class="time">Step 8</div>
+        <div class="action">Graph reaches END</div>
+        <div>Complete result returned to FastAPI. Includes everything from all 4 agents + human override.</div>
+    </div>
+</div>
+</div>
+
+<!-- TAB 4: REDEPLOYMENT -->
+<div class="tab-content" id="tab3">
+<h2>The Redeployment Problem: What Happens If You Change Code?</h2>
+
+<p>This is a CRITICAL production concern you identified. Let's walk through the scenarios.</p>
+
+<h3>Scenario: Loan APP-001 is paused at human_review. Before the human responds, you deploy new code.</h3>
+
+<div class="danger">
+<h4>⚠️ What the checkpoint stores: DATA, not CODE</h4>
+<p>The Redis checkpoint contains the <strong>state dictionary</strong> — the outputs of each agent as data (JSON blobs). It does NOT contain the agent code, the prompts, the tools, or the graph structure. Those live in your deployed code.</p>
+<p>When you resume, LangGraph loads the STATE from Redis but uses the CURRENT CODE to continue execution.</p>
+</div>
+
+<div class="grid2">
+    <div class="box box-green">
+        <h4>✅ SAFE Changes (resume works fine)</h4>
+        <ul>
+            <li><strong>Update prompts:</strong> Only affects agents that haven't run yet. For APP-001, fetch_data/doc_review/risk_scoring/compliance already ran. Only human_review and final_decision use the new prompts. Since these nodes don't call LLMs with system prompts (human_review just formats, final_decision just reports), prompt changes are safe.</li>
+            <li><strong>Change scoring criteria:</strong> risk_scoring already ran with the OLD criteria. The score (46) is in the checkpoint as DATA. New criteria affect only NEW evaluations, not resumed ones.</li>
+            <li><strong>Add logging/monitoring:</strong> No state impact.</li>
+            <li><strong>Update tool implementations:</strong> Tools already called won't re-run. Only tools in nodes after the resume point are affected.</li>
+            <li><strong>Change API response format:</strong> Only affects the FastAPI layer, not the graph state.</li>
+        </ul>
+    </div>
+    <div class="box box-red">
+        <h4>❌ BREAKING Changes (resume may fail)</h4>
+        <ul>
+            <li><strong>Change state TypedDict fields:</strong> If you rename "risk_assessment" to "risk_result", the checkpoint has "risk_assessment" but the new code reads "risk_result". KeyError on resume. <strong>FIX:</strong> Add migration logic or keep old field names.</li>
+            <li><strong>Remove a node that already ran:</strong> If you remove compliance_node, the checkpoint says compliance completed but the new graph doesn't have that node. LangGraph may error. <strong>FIX:</strong> Don't remove nodes while checkpoints exist for old graph versions.</li>
+            <li><strong>Change graph topology:</strong> If you reorder nodes or change edges, the checkpoint's execution history doesn't match the new graph structure. <strong>FIX:</strong> Drain pending reviews before deploying topology changes.</li>
+            <li><strong>Change Pydantic model fields:</strong> If the checkpoint contains a risk_assessment serialized with the old model and the new model expects different fields, deserialization fails. <strong>FIX:</strong> Version your models or add backward compatibility.</li>
+        </ul>
+    </div>
+</div>
+
+<h3>Production Deployment Strategy</h3>
+
+<div class="box box-purple">
+<h4>The "Drain and Deploy" Pattern</h4>
+<ol>
+    <li><strong>Before deploying breaking changes:</strong> Check for interrupted pipelines (pending human reviews)</li>
+    <li><strong>Option A — Drain:</strong> Notify reviewers to complete pending reviews before deployment. Deploy only when the pending queue is empty.</li>
+    <li><strong>Option B — Version:</strong> Tag each checkpoint with the code version that created it. On resume, if the checkpoint version doesn't match current code version, either (a) complete with the old code path or (b) restart the evaluation with new code.</li>
+    <li><strong>Option C — Backward compatible changes only:</strong> Never rename state fields. Never remove nodes. Only ADD new fields with defaults. Only ADD new nodes. This is the safest but most constraining approach.</li>
+</ol>
+</div>
+
+<div class="box box-gray">
+<h4>What Goldman/Camelot Already Does</h4>
+<p>This is the same problem you have with Camelot's amendment workflows. If a loan amendment is in-progress (partially completed by a user) and you deploy new code that changes the amendment flow, the in-progress amendment might break.</p>
+<p>Your existing solutions apply: blue-green deployment (old code handles old requests, new code handles new ones), database migrations with backward compatibility, feature flags to gradually enable new behavior.</p>
+<p>For LangGraph: add a <strong>"graph_version"</strong> field to your state. On resume, check if the checkpoint's graph_version matches the current version. If not, decide: complete with backward-compatible logic, or restart the evaluation.</p>
+</div>
+
+<h3>Specific Examples</h3>
+
+<table>
+    <tr><th>Change You Make</th><th>Impact on Paused APP-001</th><th>Solution</th></tr>
+    <tr>
+        <td>Update underwriter.txt prompt</td>
+        <td>No impact — risk_scoring already ran with old prompt</td>
+        <td>None needed</td>
+    </tr>
+    <tr>
+        <td>Change DTI threshold from 43% to 40%</td>
+        <td>No impact — risk_scoring already scored with old threshold. Score 46 is in checkpoint.</td>
+        <td>None for APP-001. New evaluations use new threshold.</td>
+    </tr>
+    <tr>
+        <td>Add a new agent (fraud_check) between compliance and human_review</td>
+        <td>PROBLEM — checkpoint says next node is human_review, but new graph has fraud_check before it</td>
+        <td>Drain pending reviews first, or add fraud_check as optional (skip if state doesn't have its output)</td>
+    </tr>
+    <tr>
+        <td>Rename state field "risk_assessment" to "risk_result"</td>
+        <td>BREAKS — checkpoint has old field name, new code reads new name</td>
+        <td>Add alias: read risk_result or risk_assessment. Or drain first.</td>
+    </tr>
+    <tr>
+        <td>Remove doc_review agent entirely</td>
+        <td>Resume still works IF final_decision_node handles missing document_review gracefully</td>
+        <td>Make final_decision_node tolerant of None values</td>
+    </tr>
+    <tr>
+        <td>Change LLM from Haiku to Sonnet for risk_scoring</td>
+        <td>No impact — risk_scoring already ran. Model change affects only new evaluations.</td>
+        <td>None needed</td>
+    </tr>
+</table>
+</div>
+
+<!-- TAB 5: STATE IN REDIS -->
+<div class="tab-content" id="tab4">
+<h2>Exactly What Sits in Redis</h2>
+
+<div class="box box-orange">
+<h4>The Checkpoint Record</h4>
+<pre>
+Redis Key: "langgraph:checkpoint:APP-001:005"
+Redis TTL: 604800 (7 days)
+
+Value (JSON):
+{
+  "v": 1,                          // checkpoint format version
+  "id": "checkpoint-005",
+  "ts": "2026-03-28T14:30:00Z",   // when this checkpoint was created
+  "parent_id": "checkpoint-004",    // previous checkpoint in chain
+  
+  "channel_values": {
+    "app_id": "APP-001",
+    "document_paths": ["s3://bucket/app001/w2.png", "s3://bucket/app001/paystub.png"],
+    
+    "borrower_package": {
+      "borrower": {"name": "John Doe", "ssn_last4": "1234", "income": 95000, ...},
+      "credit": {"fico": 710, "delinquencies": 1, "tier": "GOOD"},
+      "employment": {"employer": "CryptoStartup", "years": 2, "type": "FULL_TIME"},
+      "policies": {"applicable": ["Fannie Mae B3-6", "TX Section 50(a)(6)"], ...}
+    },
+    
+    "document_review": {
+      "documents_classified": [
+        {"file": "w2.png", "type": "W2", "confidence": "HIGH"},
+        {"file": "paystub.png", "type": "PAYSTUB", "confidence": "HIGH"}
+      ],
+      "extractions": [
+        {"type": "W2", "wages": 95000, "employer": "CryptoStartup"},
+        {"type": "PAYSTUB", "gross_pay": 3958, "ytd": 47500}
+      ],
+      "validations": [{"check": "employer_match", "status": "MATCH"}],
+      "missing": [{"type": "1040", "reason": "Tax filing verification"}],
+      "quality": "PARTIAL"
+    },
+    
+    "risk_assessment": {
+      "score": 46,
+      "level": "HIGH",
+      "recommendation": "MANUAL_REVIEW",
+      "criteria": [
+        {"name": "FICO", "value": 710, "threshold": 680, "score": 75, "pass": true},
+        {"name": "DTI", "value": 40.4, "threshold": 43, "score": 55, "pass": true},
+        {"name": "LTV", "value": 84.9, "threshold": 80, "score": 30, "pass": false},
+        {"name": "Employment", "value": 2.0, "threshold": 2, "score": 65, "pass": true}
+      ],
+      "industry_context": {"name": "cryptocurrency", "default_rate": 0.08},
+      "policy_violations": ["LTV exceeds Texas 80% maximum"],
+      "reasoning": "MANUAL_REVIEW — LTV violates TX limit, borderline DTI, high-risk industry..."
+    },
+    
+    "compliance_result": {
+      "status": "COMPLIANT",
+      "disclosures_required": ["Loan Estimate (3 days)", "TX Section 50(a)(6) Notice (12 days)"],
+      "audit_trail_complete": true
+    },
+    
+    "needs_manual_review": true,
+    "final_decision": null,
+    "errors": []
+  },
+  
+  "channel_versions": {
+    "fetch_data": "005",
+    "doc_review": "005",
+    "risk_scoring": "005",
+    "compliance": "005",
+    "human_review": "005"     // current node (interrupted)
+  },
+  
+  "pending_sends": [],
+  
+  "metadata": {
+    "source": "loop",
+    "step": 5,
+    "writes": {
+      "human_review": {
+        "__interrupt__": [{
+          "value": "Senior underwriter review required...",
+          "resumable": true
+        }]
+      }
+    }
+  }
+}
+</pre>
+</div>
+
+<p><strong>Key observations:</strong></p>
+<ul>
+    <li>The checkpoint is ~2-3 KB of JSON. All four agents' outputs are embedded.</li>
+    <li>The <code>__interrupt__</code> metadata tells LangGraph exactly where to resume.</li>
+    <li><code>channel_versions</code> tracks which nodes have executed.</li>
+    <li><code>parent_id</code> links to the previous checkpoint for history.</li>
+    <li>The <code>final_decision</code> field is null — that's what the human provides.</li>
+</ul>
+
+<h3>Checkpoint Chain</h3>
+<div class="diagram"><pre>
+<span class="green">checkpoint-001</span> (after fetch_data)
+  ├── borrower_package: ✅
+  ├── everything else: null
+  └── parent: null
+        │
+        ▼
+<span class="green">checkpoint-002</span> (after doc_review)
+  ├── borrower_package: ✅
+  ├── document_review: ✅
+  ├── everything else: null
+  └── parent: checkpoint-001
+        │
+        ▼
+<span class="green">checkpoint-003</span> (after risk_scoring)
+  ├── borrower_package: ✅
+  ├── document_review: ✅
+  ├── risk_assessment: ✅
+  ├── everything else: null
+  └── parent: checkpoint-002
+        │
+        ▼
+<span class="green">checkpoint-004</span> (after compliance)
+  ├── borrower_package: ✅
+  ├── document_review: ✅
+  ├── risk_assessment: ✅
+  ├── compliance_result: ✅
+  ├── needs_manual_review: true
+  └── parent: checkpoint-003
+        │
+        ▼
+<span class="red">checkpoint-005</span> (INTERRUPTED at human_review)
+  ├── ALL of above: ✅
+  ├── status: INTERRUPTED
+  ├── interrupt_value: "Senior review required..."
+  └── parent: checkpoint-004
+        │
+        ▼  <span class="orange">... human responds ...</span>
+        │
+        ▼
+<span class="blue">checkpoint-006</span> (after human_review resumes)
+  ├── ALL of above: ✅
+  ├── final_decision: "APPROVE_WITH_CONDITIONS: ..."
+  └── parent: checkpoint-005
+        │
+        ▼
+<span class="blue">checkpoint-007</span> (after final_decision → END)
+  ├── ALL fields populated: ✅
+  ├── status: COMPLETE
+  └── parent: checkpoint-006
+</pre></div>
+</div>
+
+<!-- TAB 6: Q&A -->
+<div class="tab-content" id="tab5">
+<h2>Your Questions Answered</h2>
+
+<div class="box box-blue">
+<h4>Q: What does the user enter initially?</h4>
+<p>The underwriter in Camelot UI enters the <strong>application ID</strong> (e.g., APP-001) and <strong>uploads documents</strong> (W-2, pay stubs). They click "Evaluate." That's it. The API creates the initial state and starts the graph. The user doesn't know about thread_ids, checkpoints, or LangGraph — they just see a status update: "Evaluating..." → "Pending Senior Review" → "Approved with Conditions."</p>
+</div>
+
+<div class="box box-blue">
+<h4>Q: Is the whole state configured/restored on resume?</h4>
+<p><strong>Yes, completely.</strong> The checkpoint in Redis contains the FULL state — every field populated by every agent that ran. When LangGraph resumes, it deserializes this JSON into the same Python TypedDict structure. The in-memory state after resume is IDENTICAL to what it was at the moment of interrupt. It's like loading a save game — the entire world state is restored.</p>
+</div>
+
+<div class="box box-blue">
+<h4>Q: What if I redeploy between interrupt and resume?</h4>
+<p>The checkpoint stores DATA (state values), not CODE (agent logic, prompts, graph structure). On resume, the restored data flows through the CURRENT code. Safe changes: prompt updates, scoring criteria changes, tool implementation updates, model swaps — because agents that already ran won't re-run. Breaking changes: renaming state fields, removing nodes, changing graph topology — because the checkpoint references the old structure. Solution: "drain and deploy" (complete pending reviews before breaking changes) or version your checkpoints.</p>
+</div>
+
+<div class="box box-blue">
+<h4>Q: What if I add a new agent between interrupt and resume?</h4>
+<p>If you add fraud_check between compliance and human_review: the checkpoint says the next node is human_review. The new graph has fraud_check before human_review. LangGraph will try to resume at human_review and may skip fraud_check entirely (it wasn't in the graph when the checkpoint was created). Solution: make the new node optional (check if its output exists in state, skip if not) or drain pending reviews before deploying the new node.</p>
+</div>
+
+<div class="box box-blue">
+<h4>Q: How does the response come back from API to agent?</h4>
+<p>The human submits via POST /api/reviews/APP-001/decision. Your FastAPI code calls graph_app.invoke(Command(resume="APPROVE_WITH_CONDITIONS..."), config={"configurable": {"thread_id": "APP-001"}}). LangGraph loads the checkpoint, sees it's interrupted at human_review, injects the resume string as the return value of interrupt(), and the node continues. The final result flows back through the graph to END, returns to your FastAPI code, which sends HTTP 200 to the UI.</p>
+</div>
+
+<div class="box box-blue">
+<h4>Q: How does LangGraph know this is a resume vs a new evaluation?</h4>
+<p>The <strong>Command(resume=...)</strong> object tells LangGraph this is a resume, not a new invocation. A new evaluation passes a dict (initial_state). A resume passes a Command. LangGraph checks the type: if it's a Command with resume, it loads the checkpoint for the thread_id and continues. If it's a dict, it starts fresh.</p>
+</div>
+
+<div class="box box-blue">
+<h4>Q: What if the Fargate task that started the evaluation is gone?</h4>
+<p>Doesn't matter. The checkpoint is in Redis, not in the Fargate task's memory. ANY Fargate task running the same code can resume. The resume call can come from a completely different server, different container, different availability zone. This is the entire point of externalizing state — your compute is stateless, your state is in Redis.</p>
+</div>
+
+</div>
+
+</div>
+
+<script>
+function showTab(idx) {
+    document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', i===idx));
+    document.querySelectorAll('.tab-content').forEach((t,i) => t.classList.toggle('active', i===idx));
+}
+</script>
+</body>
+</html>
+"""
+
+with open("Week4_Day4_Complete_Lifecycle.html", "w") as f:
+    f.write(html_content)
+
+print(f"✅ Interactive HTML created: {len(html_content)} chars")
+print("6 tabs: Full Data Flow, UI→API→Agent, Interrupt/Resume, Redeployment, Redis State, Q&A")

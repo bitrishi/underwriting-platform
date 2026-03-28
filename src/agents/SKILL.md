@@ -216,6 +216,115 @@ Apply industry default-rate penalty to base score:
 Policy violations and severe document issues can further reduce score and may
 force a `MANUAL_REVIEW` even when numeric score is otherwise approvable.
 
+## Compliance Workflow
+
+### `create_compliance_agent()`
+**File:** `src/agents/compliance.py`
+
+Purpose:
+- Perform final regulatory/compliance checks after risk scoring and provide an
+  escalation override when legal or audit requirements are not satisfied.
+- Uses Claude Sonnet (`task="compliance"`) for higher-quality legal reasoning.
+
+Required tool set (4 total):
+
+RAG tools (2):
+- `verify_compliance_requirement`
+- `search_lending_policies`
+
+Deterministic tools (2):
+- `check_disclosure_requirements`
+- `verify_audit_trail`
+
+Output expectations:
+- Required disclosures list (TRID/ECOA/FCRA/state)
+
+## Orchestration Framework Comparison
+
+### LangGraph vs CrewAI (Practical Guidance)
+
+- Use **LangGraph** for production underwriting orchestration where deterministic
+  routing, typed shared state, and explicit error paths are mandatory.
+- Use **CrewAI** for rapid, role-based prototyping when you want to iterate on
+  agent collaboration quickly and strict topology is less important.
+
+### Why LangGraph Is the Default Here
+
+- Explicit graph topology for parallel fan-out and controlled convergence.
+- Predictable conditional routing for manual review and fatal-failure shortcuts.
+- Better audit traceability for compliance-focused decision pipelines.
+
+### When CrewAI Is Better
+
+- Early exploration of prompts, roles, and agent responsibilities.
+- Small workflows with limited tool count and lower regulatory risk.
+- Demo-oriented multi-agent interactions where speed matters more than rigid
+  workflow guarantees.
+
+### Decision Rule
+
+- If the workflow is compliance-critical or must be reproducible, choose
+  LangGraph.
+- If the workflow is exploratory and fast-changing, start with CrewAI, then
+  migrate to LangGraph for production hardening.
+
+## Human-In-The-Loop Orchestration (Week 4 Day 4)
+
+### Interrupt/Resume Pattern
+
+- Use `interrupt()` inside `human_review_node` to pause execution and present a
+  structured review payload to a human underwriter.
+- Include borrower summary, risk assessment snapshot, and compliance outcome in
+  the interrupt payload so the human can make a defensible decision.
+- Resume execution with `Command(resume=...)` and persist the normalized human
+  decision in graph state.
+
+### Checkpointing Guidance
+
+- Compile the graph with `MemorySaver` during development to enable pause and
+  resume across invocations using `thread_id`.
+- For restart simulation and multi-instance resume in local testing, share the
+  same checkpointer object between graph instances.
+- For production durability across process crashes, replace `MemorySaver` with
+  a persistent checkpoint backend.
+- Audit-trail completeness status
+- Blocking violations list
+- Recommendation override (`NONE` or `MANUAL_REVIEW` or `DENY`)
+
+## Advanced Graph Patterns (Week 4 Day 5)
+
+### Subgraph Extraction Heuristic
+
+- Keep a node as-is while it remains linear and testable.
+- Extract a node to a subgraph when it gains multiple internal branches,
+  conditional lookups, or mixed responsibilities (for example deterministic
+  metrics plus optional context enrichment plus synthesis).
+
+### Streaming for Observability
+
+- Prefer `graph.stream(...)` for operator-facing runs to surface node completion
+  events and intermediate state growth in real time.
+- Keep `graph.invoke(...)` for API paths that only need final output.
+
+### Dynamic Routing by Loan Type
+
+- Route from risk scoring to loan-type-specific checks using a deterministic
+  router function (for example `route_by_loan_type`).
+- Keep the default path (`conventional`) stable and insert specialty nodes
+  (`fha_compliance`) only when needed.
+
+### Human Review Loop Safety
+
+- If a human requests additional data, allow a controlled loop back to data
+  fetch/re-score.
+- Enforce a hard max-iteration safety cap (for example 3) to prevent infinite
+  cycles and force terminal output when exceeded.
+
+Orchestrator interaction:
+- The graph runs compliance after risk scoring.
+- `should_escalate(...)` checks both risk recommendation and compliance
+  `recommendation_override` before deciding on `human_review`.
+
 
 
 ## Agent Invocation Notes
