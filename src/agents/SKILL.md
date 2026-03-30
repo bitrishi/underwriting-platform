@@ -325,6 +325,30 @@ Orchestrator interaction:
 - `should_escalate(...)` checks both risk recommendation and compliance
   `recommendation_override` before deciding on `human_review`.
 
+## External Agent Interop (Week 5)
+
+When moving beyond one underwriting system into multiple independently owned
+agent systems, distinguish internal orchestration from external delegation.
+
+### Internal vs External Rule
+
+- Internal (same orchestrator, shared state): keep in LangGraph node/edge flow.
+- External (independent remote agent system): use A2A-style task delegation.
+
+### MCP vs A2A Rule
+
+- Use MCP for agent-to-tool integration (policy search, data fetch, graph query).
+- Use A2A for agent-to-agent interaction (appraisal agent, title agent,
+  servicing agent handoffs).
+
+### Enterprise Workflow Mapping Guidance
+
+- Lender core underwriting decisions remain internal graph logic.
+- Servicer/appraiser/title/insurance interactions are strong A2A candidates
+  when those systems are run independently.
+- EventBridge remains the preferred fan-out bus for enterprise event
+  propagation to many downstream consumers.
+
 
 
 ## Agent Invocation Notes

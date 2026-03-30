@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from langchain_aws import ChatBedrock
 
-from src.config.bedrock import create_llm
+from src.config.bedrock import MODELS, create_llm, get_model_for_task
 from src.config.settings import settings
 
 
@@ -25,17 +25,17 @@ class TestCreateLLM:
             # The return value should be the mock instance
             assert isinstance(mock_bedrock.return_value, MagicMock)
     
-    def test_create_llm_uses_correct_model_id(self) -> None:
-        """Test that create_llm() uses the model ID from settings."""
+    def test_create_llm_uses_default_task_model_id(self) -> None:
+        """Test that create_llm() uses task-based default model routing."""
         with patch('src.config.bedrock.ChatBedrock') as mock_bedrock:
             mock_bedrock.return_value = MagicMock(spec=ChatBedrock)
             
             create_llm()
             
-            # Verify ChatBedrock was called with the correct model_id
             call_kwargs = mock_bedrock.call_args.kwargs
-            assert call_kwargs['model_id'] == settings.bedrock_model_id, \
-                f"Expected model_id={settings.bedrock_model_id}, got {call_kwargs['model_id']}"
+            expected_model = MODELS[get_model_for_task("default")]
+            assert call_kwargs['model_id'] == expected_model, \
+                f"Expected model_id={expected_model}, got {call_kwargs['model_id']}"
     
     def test_create_llm_uses_correct_region(self) -> None:
         """Test that create_llm() uses the AWS region from settings."""
@@ -111,7 +111,7 @@ class TestCreateLLM:
             call_kwargs = mock_bedrock.call_args.kwargs
             
             # Verify all parameters
-            assert call_kwargs['model_id'] == settings.bedrock_model_id
+            assert call_kwargs['model_id'] == MODELS[get_model_for_task("default")]
             assert call_kwargs['region_name'] == settings.aws_region
             assert call_kwargs['model_kwargs']['temperature'] == 0.5
             assert call_kwargs['model_kwargs']['max_tokens'] == 512
@@ -156,8 +156,8 @@ class TestCreateLLMIntegration:
             
             call_kwargs = mock_bedrock.call_args.kwargs
             
-            # Verify the settings values are passed
-            assert call_kwargs['model_id'] == settings.bedrock_model_id
+            # Verify the routed model and settings values are passed
+            assert call_kwargs['model_id'] == MODELS[get_model_for_task("default")]
             assert call_kwargs['region_name'] == settings.aws_region
             
             # Verify they match expected patterns

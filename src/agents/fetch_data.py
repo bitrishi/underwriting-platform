@@ -20,7 +20,7 @@ def create_fetch_data_agent():
     The agent autonomously decides which tools to call
     and in what order based on the application.
     """
-    llm = create_llm(temperature=0)
+    llm = create_llm(task="fetch_data", temperature=0)
     
     system_prompt = load_prompt("fetch_data")
     

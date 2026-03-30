@@ -34,7 +34,7 @@ class ExtractionResult(BaseModel):
     document_type: Literal["W2", "1040", "PAYSTUB"] = Field(
         ..., description="Normalized document type used for extraction."
     )
-    extraction_method: Literal["TEXT", "VISION"] = Field(
+    extraction_method: Literal["TEXT", "VISION", "TEXTRACT", "HYBRID"] = Field(
         ..., description="Whether extraction used text parsing or vision analysis."
     )
     extracted_data: DocumentExtractionData = Field(

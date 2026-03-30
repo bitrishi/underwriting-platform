@@ -9,6 +9,8 @@ Routes tasks to the optimal model:
 Changing which model handles which task is a CONFIG change, not a code change.
 """
 
+from typing import Any
+
 from langchain_aws import ChatBedrock
 from src.config.settings import settings
 
@@ -51,10 +53,71 @@ TASK_MODEL_MAP = {
 }
 
 
+TASK_GUARDRAIL_ROLE_MAP = {
+    "fetch_data": "fetch",
+    "doc_review": "doc_review",
+    "risk_scoring": "risk",
+    "compliance": "compliance",
+    "default": "default",
+}
+
+
+GUARDRAIL_CONFIGS = {
+    "default": {
+        "guardrailIdentifier": settings.bedrock_guardrail_id,
+        "guardrailVersion": settings.bedrock_guardrail_version,
+        "trace": True,
+    },
+    "fetch": {
+        "guardrailIdentifier": settings.bedrock_guardrail_id_fetch,
+        "guardrailVersion": settings.bedrock_guardrail_version_fetch,
+        "trace": True,
+    },
+    "doc_review": {
+        "guardrailIdentifier": settings.bedrock_guardrail_id_doc_review,
+        "guardrailVersion": settings.bedrock_guardrail_version_doc_review,
+        "trace": True,
+    },
+    "risk": {
+        "guardrailIdentifier": settings.bedrock_guardrail_id_risk,
+        "guardrailVersion": settings.bedrock_guardrail_version_risk,
+        "trace": True,
+    },
+    "compliance": {
+        "guardrailIdentifier": settings.bedrock_guardrail_id_compliance,
+        "guardrailVersion": settings.bedrock_guardrail_version_compliance,
+        "trace": True,
+    },
+}
+
+
+def _resolve_guardrail_config(
+    task: str,
+    guardrail_id: str | None,
+    guardrail_version: str | None,
+) -> dict[str, Any] | None:
+    if guardrail_id and guardrail_version:
+        return {
+            "guardrailIdentifier": guardrail_id,
+            "guardrailVersion": guardrail_version,
+            "trace": True,
+        }
+
+    role = TASK_GUARDRAIL_ROLE_MAP.get(task, "default")
+    cfg = GUARDRAIL_CONFIGS.get(role, GUARDRAIL_CONFIGS["default"])
+
+    if not cfg.get("guardrailIdentifier") or not cfg.get("guardrailVersion"):
+        return None
+
+    return cfg
+
+
 def create_llm(
     task: str = "default",
     temperature: float = 0,
     max_tokens: int = 1024,
+    guardrail_id: str | None = None,
+    guardrail_version: str | None = None,
 ) -> ChatBedrock:
     """
     Create a Bedrock LLM client optimized for a specific task.
@@ -82,15 +145,27 @@ def create_llm(
     """
     # Look up model for this task, fall back to default
     model_key = TASK_MODEL_MAP.get(task, task)
-    model_id = MODELS.get(model_key, MODELS["haiku"])
+    model_id = MODELS.get(model_key, MODELS.get("haiku", settings.bedrock_model_id))
 
-    return ChatBedrock(
-        model_id=model_id,
-        region_name=settings.aws_region,
-        model_kwargs={
+    kwargs: dict[str, Any] = {
+        "model_id": model_id,
+        "region_name": settings.aws_region,
+        "model_kwargs": {
             "max_tokens": max_tokens,
             "temperature": temperature,
         },
+    }
+
+    guardrails = _resolve_guardrail_config(
+        task=task,
+        guardrail_id=guardrail_id,
+        guardrail_version=guardrail_version,
+    )
+    if guardrails:
+        kwargs["guardrails"] = guardrails
+
+    return ChatBedrock(
+        **kwargs,
     )
 
 
@@ -106,3 +181,8 @@ def get_model_for_task(task: str) -> str:
         Model key (e.g., "haiku", "sonnet")
     """
     return TASK_MODEL_MAP.get(task, TASK_MODEL_MAP["default"])
+
+
+def get_guardrail_for_task(task: str) -> dict[str, Any] | None:
+    """Get resolved guardrail configuration for a task."""
+    return _resolve_guardrail_config(task=task, guardrail_id=None, guardrail_version=None)

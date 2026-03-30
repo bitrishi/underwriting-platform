@@ -23,6 +23,16 @@ class Settings:
     neo4j_uri: str
     neo4j_user: str
     neo4j_password: str
+    bedrock_guardrail_id: str
+    bedrock_guardrail_version: str
+    bedrock_guardrail_id_fetch: str
+    bedrock_guardrail_version_fetch: str
+    bedrock_guardrail_id_doc_review: str
+    bedrock_guardrail_version_doc_review: str
+    bedrock_guardrail_id_risk: str
+    bedrock_guardrail_version_risk: str
+    bedrock_guardrail_id_compliance: str
+    bedrock_guardrail_version_compliance: str
     
     def __post_init__(self) -> None:
         """Validate settings after initialization."""
@@ -69,6 +79,9 @@ def load_settings() -> Settings:
     Raises:
         ValueError: If required settings are missing or invalid
     """
+    default_guardrail_id = os.getenv("BEDROCK_GUARDRAIL_ID", "hissb9w0wpbg")
+    default_guardrail_version = os.getenv("BEDROCK_GUARDRAIL_VERSION", "1")
+
     return Settings(
         aws_region=os.getenv("AWS_REGION", "us-east-1"),
         bedrock_model_id=os.getenv(
@@ -80,6 +93,16 @@ def load_settings() -> Settings:
         neo4j_uri=os.getenv("NEO4J_URI", "bolt://localhost:7687"),
         neo4j_user=os.getenv("NEO4J_USER", "neo4j"),
         neo4j_password=os.getenv("NEO4J_PASSWORD", "neo4jpassword"),
+        bedrock_guardrail_id=default_guardrail_id,
+        bedrock_guardrail_version=default_guardrail_version,
+        bedrock_guardrail_id_fetch=os.getenv("BEDROCK_GUARDRAIL_ID_FETCH", default_guardrail_id),
+        bedrock_guardrail_version_fetch=os.getenv("BEDROCK_GUARDRAIL_VERSION_FETCH", default_guardrail_version),
+        bedrock_guardrail_id_doc_review=os.getenv("BEDROCK_GUARDRAIL_ID_DOC_REVIEW", default_guardrail_id),
+        bedrock_guardrail_version_doc_review=os.getenv("BEDROCK_GUARDRAIL_VERSION_DOC_REVIEW", default_guardrail_version),
+        bedrock_guardrail_id_risk=os.getenv("BEDROCK_GUARDRAIL_ID_RISK", default_guardrail_id),
+        bedrock_guardrail_version_risk=os.getenv("BEDROCK_GUARDRAIL_VERSION_RISK", default_guardrail_version),
+        bedrock_guardrail_id_compliance=os.getenv("BEDROCK_GUARDRAIL_ID_COMPLIANCE", default_guardrail_id),
+        bedrock_guardrail_version_compliance=os.getenv("BEDROCK_GUARDRAIL_VERSION_COMPLIANCE", default_guardrail_version),
     )
 
 

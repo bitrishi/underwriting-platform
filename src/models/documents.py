@@ -91,11 +91,16 @@ class DocumentExtractionMetadata(BaseModel):
     document_path: str = Field(
         ..., description="Absolute or relative path to the processed document."
     )
-    processing_method: Literal["text", "vision"] = Field(
+    processing_method: Literal["text", "vision", "textract", "hybrid"] = Field(
         ..., description="Whether extraction used text parsing or vision fallback."
     )
     processing_time_ms: float = Field(
         ..., ge=0, description="Total extraction processing time in milliseconds."
+    )
+    estimated_cost_usd: float = Field(
+        default=0.0,
+        ge=0,
+        description="Estimated per-document extraction cost in USD.",
     )
 
 

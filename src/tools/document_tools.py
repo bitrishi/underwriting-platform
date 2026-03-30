@@ -11,6 +11,9 @@ from typing import Any
 from langchain_core.tools import tool
 from pypdf import PdfReader
 
+from src.tools.document_router import route_document
+from src.tools.field_mappings import map_textract_to_model
+from src.tools.textract_tools import detect_document_text
 from src.models.document_review import (
     CrossValidationResult,
     DocumentClassification,
@@ -28,6 +31,19 @@ from src.models.documents import (
 
 SUPPORTED_EXTENSIONS = {".txt", ".pdf", ".png", ".jpg", ".jpeg"}
 SUPPORTED_DOCUMENT_TYPES = {"w2", "1040", "paystub"}
+
+
+def _estimate_extraction_cost_usd(method: str, page_count: int) -> float:
+    normalized = method.lower()
+    if normalized == "textract":
+        # Approximate for FORMS/TEXT extraction on standard underwriting docs.
+        return round(page_count * 0.0015, 6)
+    if normalized == "vision":
+        # Approximate model invocation cost for image extraction.
+        return round(page_count * 0.01, 6)
+    if normalized == "hybrid":
+        return round((page_count * 0.0015) + (page_count * 0.01), 6)
+    return 0.0
 
 
 def encode_image(image_path: str) -> str:
@@ -300,7 +316,11 @@ def _normalize_extraction_result(raw: dict[str, Any]) -> ExtractionResult:
 
 
 @tool
-def extract_document_data(document_path: str, document_type: str) -> dict:
+def extract_document_data(
+    document_path: str,
+    document_type: str,
+    preferred_method: str = "auto",
+) -> dict:
     """Extract structured data from an underwriting document.
 
     The tool chooses text extraction for `.txt` and digital PDFs when possible,
@@ -310,6 +330,7 @@ def extract_document_data(document_path: str, document_type: str) -> dict:
     Args:
         document_path: Path to the source document.
         document_type: One of `w2`, `1040`, or `paystub`.
+        preferred_method: `auto`, `text`, `vision`, or `textract`.
 
     Returns:
         Serialized `DocumentExtractionResult` on success, otherwise an error dict.
@@ -324,17 +345,31 @@ def extract_document_data(document_path: str, document_type: str) -> dict:
             return {"error": f"Unsupported file format: {path.suffix}"}
         if document_type not in SUPPORTED_DOCUMENT_TYPES:
             return {"error": f"Unsupported document type: {document_type}"}
+        if preferred_method not in {"auto", "text", "vision", "textract"}:
+            return {"error": f"Unsupported preferred_method: {preferred_method}"}
 
-        method = "text" if has_extractable_text(document_path) else "vision"
-        raw_text = _read_text_for_extraction(document_path, method)
-        extracted = _extract_by_type(document_type, raw_text)
+        route = route_document(document_path, declared_document_type=document_type)
+        method = route["primary_method"] if preferred_method == "auto" else preferred_method
+        extraction_method = method
+
+        if method == "textract":
+            textract_payload = detect_document_text(document_path)
+            extracted = map_textract_to_model(document_type, textract_payload)
+        else:
+            if method == "text" and not has_extractable_text(document_path):
+                extraction_method = "vision"
+            raw_text = _read_text_for_extraction(document_path, extraction_method)
+            extracted = _extract_by_type(document_type, raw_text)
+
+        page_count = _get_page_count(document_path)
         result = DocumentExtractionResult(
             document_type=document_type,
             extracted_data=extracted,
             metadata=DocumentExtractionMetadata(
                 document_path=str(path),
-                processing_method=method,
+                processing_method=extraction_method,
                 processing_time_ms=(time.perf_counter() - start) * 1000.0,
+                estimated_cost_usd=_estimate_extraction_cost_usd(extraction_method, page_count),
             ),
         )
         return result.model_dump()

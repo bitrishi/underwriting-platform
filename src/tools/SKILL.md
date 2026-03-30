@@ -130,3 +130,59 @@ This creates a multi-source risk picture combining document, graph, and policy d
 - Integration-style fetch agent + tool wiring tests: `tests/test_fetch_agent.py`
 - RAG and retrieval behavior tests: `tests/test_rag.py`, `tests/test_retriever.py`,
   `tests/test_vectorstore.py`
+
+## MCP Integration Guidance (Week 5)
+
+Use MCP for tools that are shared across teams or backed by external systems,
+and keep deterministic math/validation local as `@tool`.
+
+Current first MCP extraction:
+- `search_lending_policies` via `src/mcp/policy_server.py`
+
+Validation paths:
+- Protocol roundtrip and server registration: `tests/test_mcp_policy_server.py`
+- Agent-side MCP client flow: `src/exercises/week5_day1_mcp.py`
+
+Decision rule:
+- Keep local: low-latency deterministic calculators and simple compliance checks.
+- Move to MCP: policy search, external data fetchers, graph-backed shared context.
+
+## Textract Hybrid Extraction (Week 5 Day 4)
+
+Use a hybrid route for underwriting document extraction:
+
+- Standard forms (`W2`, `1040`, `paystub`) on image/PDF inputs:
+  - Primary: Textract OCR + key-value mapping
+  - Fallback: local text/vision parser
+- Plain text files:
+  - Primary: deterministic regex extraction
+- Handwritten or irregular documents:
+  - Primary: vision fallback
+
+New modules:
+
+- `src/tools/textract_tools.py`
+  - `detect_document_text(document_path)`
+  - Returns `raw_text`, per-line confidence, key-value fields, page slices.
+- `src/tools/field_mappings.py`
+  - `map_textract_to_model(document_type, textract_payload, confidence_threshold=80)`
+  - Maps Textract output into Pydantic extraction models and marks low-confidence fields as unclear.
+- `src/tools/document_router.py`
+  - `route_document(document_path, declared_document_type=None)`
+  - Chooses `text`, `vision`, or `textract` route using file/type heuristics.
+- `src/tools/textract_to_rag.py`
+  - `chunk_textract_pages(...)` and `ingest_textract_documents_to_faiss(...)`
+  - Preserves page metadata while chunking and indexing extracted text.
+
+`extract_document_data` now supports method override for comparisons:
+
+- `preferred_method="auto"` (default)
+- `preferred_method="text" | "vision" | "textract"`
+
+Cost tracking:
+
+- Per-document extraction metadata now includes `estimated_cost_usd`.
+- Current estimates are lightweight heuristics for local exercises:
+  - text: `$0.00`
+  - textract: `~$0.0015/page`
+  - vision: `~$0.01/page`
