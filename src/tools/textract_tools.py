@@ -11,6 +11,7 @@ from botocore.exceptions import BotoCoreError, ClientError
 from pypdf import PdfReader
 
 from src.config.settings import settings
+from src.utils.retry import retry_with_backoff
 
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg"}
 PDF_EXTENSIONS = {".pdf"}
@@ -153,11 +154,23 @@ def _fallback_from_local_text(document_path: Path) -> dict[str, Any]:
     }
 
 
+@retry_with_backoff(
+    max_retries=2,
+    base_delay=0.5,
+    max_delay=10.0,
+    retryable_exceptions=(BotoCoreError,),
+    jitter=True,
+)
 def detect_document_text(
     document_path: str,
     feature_types: list[str] | None = None,
 ) -> dict[str, Any]:
     """Extract OCR text and key-value fields using Textract when available.
+
+    Retries up to 2 times on transient ``BotoCoreError`` failures with
+    exponential backoff.  ``ClientError`` (e.g. invalid credentials) and
+    ``RuntimeError`` / ``ValueError`` are not retried and fall through to
+    the local-text fallback inside the function body.
 
     If Textract calls fail due to credentials/network constraints, this function
     degrades gracefully to local deterministic text extraction.

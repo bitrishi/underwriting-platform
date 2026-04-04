@@ -186,3 +186,92 @@ Cost tracking:
   - text: `$0.00`
   - textract: `~$0.0015/page`
   - vision: `~$0.01/page`
+
+## Resilience Utilities (Week 5 Day 5)
+
+All external API calls should be wrapped with the retry decorator and routed
+through a circuit breaker. Errors must be categorized before reaching
+`final_decision_node`. Metrics are collected per node and summarised
+for the audit trail and CloudWatch.
+
+### `src/utils/retry.py` — `retry_with_backoff`
+
+```python
+@retry_with_backoff(
+    max_retries=3,
+    base_delay=0.5,
+    max_delay=30.0,
+    retryable_exceptions=(ConnectionError, TimeoutError),
+    jitter=True,
+)
+def call_external_api(...) -> dict:
+    ...
+```
+
+- Delay formula: `min(base_delay * 2^attempt, max_delay) + jitter(0..20%)`
+- Non-retryable exceptions propagate immediately (on first attempt).
+- Each retry logs a `WARNING`; final failure logs an `ERROR`.
+
+### `src/utils/circuit_breaker.py` — `CircuitBreaker`
+
+```python
+from src.utils.circuit_breaker import bedrock_breaker
+
+result = bedrock_breaker.call(my_bedrock_fn, prompt)
+```
+
+Pre-built breakers (all registered in `ALL_BREAKERS`):
+
+| Name | `failure_threshold` | `timeout_period` |
+|------|---------------------|-----------------|
+| `bedrock_breaker` | 5 | 30 s |
+| `credit_bureau_breaker` | 3 | 60 s |
+| `employment_breaker` | 3 | 60 s |
+| `neo4j_breaker` | 5 | 45 s |
+| `opensearch_breaker` | 5 | 45 s |
+
+State transitions: `CLOSED → OPEN → HALF_OPEN → CLOSED` (or `→ OPEN` on probe failure).
+
+### `src/utils/error_types.py` — `StructuredError` + `categorize_pipeline_errors`
+
+```python
+err = StructuredError.recoverable("fetch_data_node", "credit timeout", retry_count=2)
+state["errors"].append(err.to_state_string())   # "[RECOVERABLE] fetch_data_node: ..."
+
+groups = categorize_pipeline_errors(state["errors"])
+# {"RECOVERABLE": [...], "FATAL": [...]}
+```
+
+Categories: `RECOVERABLE` | `DEGRADED` | `FATAL`
+
+### `src/utils/metrics.py` — `PipelineMetrics`
+
+```python
+m = PipelineMetrics(evaluation_id=app_id)
+m.start_node("fetch_data")
+# ... run node ...
+m.end_node("fetch_data", status="success", llm_calls=1, tools_called=[...], cost_estimate_usd=0.0012)
+
+summary = m.summary()          # full audit dict
+records = m.to_cloudwatch_metrics()  # list[dict] for PutMetricData
+```
+
+### `src/utils/health_check.py` — `check_all_dependencies`
+
+```python
+from src.utils.health_check import check_all_dependencies
+
+report = check_all_dependencies()
+# {"status": "healthy"|"degraded"|"unhealthy", "dependencies": {...}, "circuit_breakers": {...}}
+```
+
+Checks: Bedrock (`list_foundation_models`), Neo4j (`verify_connectivity`),
+FAISS (file exists), OpenSearch (`/_cluster/health`), all circuit-breaker states.
+
+### Applied to tools
+
+- `src/tools/textract_tools.detect_document_text` — `retry_with_backoff` on `BotoCoreError`
+- `src/tools/graph_tools._query_borrower_risk` — `retry_with_backoff` on `ServiceUnavailable/TransientError`
+- `src/tools/graph_tools._query_similar_loans` — same
+- `src/tools/graph_tools._query_state_regulations` — same
+- `get_borrower_risk_context` / `find_similar_past_loans` / `get_state_regulations` — all route through `neo4j_breaker`
