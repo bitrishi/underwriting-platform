@@ -1,6 +1,9 @@
 from langchain_core.tools import tool
 from datetime import datetime
 
+from src.utils.circuit_breaker import credit_bureau_breaker, employment_breaker
+from src.utils.retry import retry_with_backoff
+
 
 @tool
 def pull_borrower_data(app_id: str) -> dict:
@@ -74,10 +77,29 @@ def pull_credit_report(ssn_last_four: str) -> dict:
         },
     }
     
-    data = reports.get(ssn_last_four)
-    if not data:
-        return {"error": f"No credit report for SSN ***-**-{ssn_last_four}"}
-    return data
+    @retry_with_backoff(
+        max_retries=2,
+        base_delay=0.2,
+        max_delay=2.0,
+        retryable_exceptions=(TimeoutError, ConnectionError),
+        jitter=True,
+    )
+    def _fetch_credit_report(last4: str) -> dict:
+        data = reports.get(last4)
+        if not data:
+            return {"error": f"No credit report for SSN ***-**-{last4}"}
+        return data
+
+    try:
+        return credit_bureau_breaker.call(_fetch_credit_report, ssn_last_four)
+    except Exception as exc:
+        return {
+            "error": f"Credit bureau unavailable: {exc}",
+            "fico_score": None,
+            "tier": "UNVERIFIED",
+            "degraded": True,
+            "source": "credit_bureau",
+        }
 
 
 @tool
@@ -111,7 +133,25 @@ def pull_employment_history(ssn_last_four: str) -> dict:
         },
     }
     
-    data = records.get(ssn_last_four)
-    if not data:
-        return {"error": f"No employment record for ***-**-{ssn_last_four}"}
-    return data
+    @retry_with_backoff(
+        max_retries=2,
+        base_delay=0.2,
+        max_delay=2.0,
+        retryable_exceptions=(TimeoutError, ConnectionError),
+        jitter=True,
+    )
+    def _fetch_employment_history(last4: str) -> dict:
+        data = records.get(last4)
+        if not data:
+            return {"error": f"No employment record for ***-**-{last4}"}
+        return data
+
+    try:
+        return employment_breaker.call(_fetch_employment_history, ssn_last_four)
+    except Exception as exc:
+        return {
+            "error": f"Employment verification unavailable: {exc}",
+            "verified": False,
+            "degraded": True,
+            "source": "employment_verification",
+        }

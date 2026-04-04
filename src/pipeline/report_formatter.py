@@ -25,6 +25,10 @@ def format_underwriting_report(state: dict[str, Any]) -> str:
     node_timestamps = state.get("node_timestamps", {})
     node_durations = state.get("node_durations_s", {})
     errors = state.get("errors", [])
+    error_categories = state.get("error_categories", {})
+    circuit_breaker_states = state.get("circuit_breaker_states", {})
+    guardrails_intervened = bool(state.get("guardrails_intervened", False))
+    metrics_summary = state.get("metrics_summary", {})
 
     graph_version = state.get("graph_version", "v1")
     thread_id = state.get("thread_id", "")
@@ -73,6 +77,11 @@ def format_underwriting_report(state: dict[str, Any]) -> str:
             _json_block(node_durations),
             f"errors_count={len(errors)}",
             _json_block(errors),
+            "error_categories=",
+            _json_block(error_categories),
+            "guardrails_intervened=" + str(guardrails_intervened),
+            "circuit_breaker_states=",
+            _json_block(circuit_breaker_states),
             "",
             "PIPELINE METADATA",
             f"graph_version={graph_version}",
@@ -81,6 +90,8 @@ def format_underwriting_report(state: dict[str, Any]) -> str:
             f"total_tool_calls={total_tool_calls}",
             f"total_llm_calls={total_llm_calls}",
             f"estimated_cost_usd={estimated_cost}",
+            "metrics_summary=",
+            _json_block(metrics_summary),
             "",
         ]
     )

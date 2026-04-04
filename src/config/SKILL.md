@@ -33,3 +33,26 @@ Configuration source:
 Operational rule:
 - Always call `create_llm(task=...)` in agents so role guardrails are applied.
 - Use explicit `guardrail_id` and `guardrail_version` only for controlled overrides.
+
+## Guardrail Scope (Week 5 Hardened)
+
+`create_llm(...)` now supports `apply_guardrails` and internal-task exemptions.
+
+- Agent-facing tasks (`fetch_data`, `doc_review`, `risk_scoring`, `compliance`) keep guardrails ON.
+- Internal grading/check tasks skip guardrails by default:
+	- `retrieval_grading`
+	- `hallucination_check`
+
+Rationale:
+- guardrails should protect user-facing generation flows,
+- but internal deterministic grading/check chains should avoid false positives
+	that can hide retrieval quality signals.
+
+## Resilience Hooks
+
+Bedrock calls are protected at orchestrator invocation boundaries:
+- Retry with exponential backoff (`retry_with_backoff`)
+- Circuit breaker (`bedrock_breaker`)
+
+When Bedrock circuit is open, nodes degrade gracefully and route toward
+manual underwriting instead of hard-failing the entire graph.

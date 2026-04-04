@@ -46,3 +46,39 @@ flowchart TD
 - Every node wraps work in try/except and writes failures to `errors`.
 - Graph compiles with `MemorySaver` in development.
 - Use persistent checkpoint backend (Redis) in production.
+
+## Production Hardening (Week 5 Weekend)
+
+### Structured Errors
+- Node error handling should emit categorized errors using `StructuredError`:
+    - `RECOVERABLE`: transient failures; continue with partial data
+    - `DEGRADED`: service unavailable but pipeline remains operational
+    - `FATAL`: pipeline cannot produce a trustworthy decision
+
+`final_decision_node` groups errors via `categorize_pipeline_errors(...)` and
+persists `error_categories` into state and report output.
+
+### Metrics
+- Every node records metrics into `metrics_summary`:
+    - duration
+    - llm/tool usage
+    - retries
+    - cost estimate
+    - node success/degraded/failed status
+
+Final report includes full metrics summary for audit and CloudWatch export.
+
+### Guardrails + Bedrock Resilience
+- Agent invocations in `_invoke_agent` are wrapped with retry + `bedrock_breaker`.
+- Bedrock circuit-open conditions are surfaced and treated as degraded/fallback
+    rather than silently ignored.
+
+### Circuit Breaker Telemetry
+- Final state includes `circuit_breaker_states` from `ALL_BREAKERS`.
+- This is used by both the report and health endpoint for runtime diagnostics.
+
+### Document Review Hybrid Routing
+- `doc_review_node` uses `route_document` per file.
+- Standard forms prefer Textract with fallback to Vision on low confidence.
+- Unstructured documents follow Vision route.
+- Per-document extraction method + estimated cost are stored in review payload.

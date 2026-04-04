@@ -53,6 +53,12 @@ TASK_MODEL_MAP = {
 }
 
 
+INTERNAL_TASKS_WITHOUT_GUARDRAILS = {
+    "retrieval_grading",
+    "hallucination_check",
+}
+
+
 TASK_GUARDRAIL_ROLE_MAP = {
     "fetch_data": "fetch",
     "doc_review": "doc_review",
@@ -118,6 +124,7 @@ def create_llm(
     max_tokens: int = 1024,
     guardrail_id: str | None = None,
     guardrail_version: str | None = None,
+    apply_guardrails: bool = True,
 ) -> ChatBedrock:
     """
     Create a Bedrock LLM client optimized for a specific task.
@@ -130,6 +137,9 @@ def create_llm(
               Can also be a model key from MODELS (e.g., "haiku", "sonnet")
         temperature: 0 for deterministic (default for all underwriting tasks)
         max_tokens: Maximum response tokens
+        apply_guardrails: Whether to attach Bedrock guardrails. Defaults to
+            True for agent-facing calls. Internal grader/checker tasks can
+            disable guardrails for deterministic low-level scoring.
 
     Returns:
         ChatBedrock instance configured for the task
@@ -156,13 +166,15 @@ def create_llm(
         },
     }
 
-    guardrails = _resolve_guardrail_config(
-        task=task,
-        guardrail_id=guardrail_id,
-        guardrail_version=guardrail_version,
-    )
-    if guardrails:
-        kwargs["guardrails"] = guardrails
+    should_apply_guardrails = apply_guardrails and task not in INTERNAL_TASKS_WITHOUT_GUARDRAILS
+    if should_apply_guardrails:
+        guardrails = _resolve_guardrail_config(
+            task=task,
+            guardrail_id=guardrail_id,
+            guardrail_version=guardrail_version,
+        )
+        if guardrails:
+            kwargs["guardrails"] = guardrails
 
     return ChatBedrock(
         **kwargs,

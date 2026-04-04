@@ -2,6 +2,8 @@ from langchain_core.tools import tool
 
 from src.rag.rag_chain import format_docs
 from src.rag.vectorstore import build_vectorstore, load_vectorstore
+from src.utils.circuit_breaker import opensearch_breaker
+from src.utils.retry import retry_with_backoff
 
 
 def _search_with_rebuild_on_mismatch(
@@ -10,13 +12,26 @@ def _search_with_rebuild_on_mismatch(
     k: int = 3,
 ):
     """Run similarity search and rebuild store if FAISS dimensionality is stale."""
-    vectorstore = load_vectorstore()
+    @retry_with_backoff(
+        max_retries=2,
+        base_delay=0.3,
+        max_delay=3.0,
+        retryable_exceptions=(TimeoutError, ConnectionError),
+        jitter=True,
+    )
+    def _run_similarity_search() -> list:
+        vectorstore = load_vectorstore()
+        try:
+            return vectorstore.similarity_search(query, k=k, filter=metadata_filter)
+        except AssertionError:
+            # Rebuild when persisted index dimensions do not match current embedding model.
+            rebuilt = build_vectorstore("data/policies")
+            return rebuilt.similarity_search(query, k=k, filter=metadata_filter)
+
     try:
-        return vectorstore.similarity_search(query, k=k, filter=metadata_filter)
-    except AssertionError:
-        # Rebuild when persisted index dimensions do not match current embedding model.
-        rebuilt = build_vectorstore("data/policies")
-        return rebuilt.similarity_search(query, k=k, filter=metadata_filter)
+        return opensearch_breaker.call(_run_similarity_search)
+    except Exception:
+        return []
 
 @tool
 def search_lending_policies(

@@ -32,6 +32,18 @@ def merge_float_dicts(
     return merged
 
 
+def merge_any_dicts(
+    left: dict[str, Any] | None,
+    right: dict[str, Any] | None,
+) -> dict[str, Any]:
+    merged: dict[str, Any] = {}
+    if left:
+        merged.update(left)
+    if right:
+        merged.update(right)
+    return merged
+
+
 class UnderwritingState(TypedDict, total=False):
     """State bag accumulated across orchestrator node execution."""
 
@@ -75,3 +87,7 @@ class UnderwritingState(TypedDict, total=False):
     # Observability
     messages: Annotated[list, add_messages]
     errors: Annotated[list[str], add]
+    error_categories: Annotated[dict[str, Any], merge_any_dicts]
+    metrics_summary: Annotated[dict[str, Any], merge_any_dicts]
+    guardrails_intervened: bool
+    circuit_breaker_states: dict[str, Any]

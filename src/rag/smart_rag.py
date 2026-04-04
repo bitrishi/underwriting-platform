@@ -23,6 +23,8 @@ from src.rag.query_templates import (
     expand_query_with_synonyms,
 )
 from src.models.compliance import ComplianceAnswer
+from src.utils.circuit_breaker import opensearch_breaker
+from src.utils.retry import retry_with_backoff
 
 logger = logging.getLogger(__name__)
 
@@ -249,11 +251,24 @@ class SmartRAG:
         Returns:
             List of Document objects with content and metadata
         """
-        search_kwargs = {"k": k}
-        if self.metadata_filter:
-            search_kwargs["filter"] = self.metadata_filter
+        @retry_with_backoff(
+            max_retries=2,
+            base_delay=0.3,
+            max_delay=3.0,
+            retryable_exceptions=(TimeoutError, ConnectionError),
+            jitter=True,
+        )
+        def _search() -> list:
+            search_kwargs = {"k": k}
+            if self.metadata_filter:
+                search_kwargs["filter"] = self.metadata_filter
+            return self.vectorstore.similarity_search(query, **search_kwargs)
 
-        return self.vectorstore.similarity_search(query, **search_kwargs)
+        try:
+            return opensearch_breaker.call(_search)
+        except Exception:
+            logger.warning("OpenSearch/FAISS search unavailable; returning empty retrieval set")
+            return []
 
     def _verify_answer(
         self,

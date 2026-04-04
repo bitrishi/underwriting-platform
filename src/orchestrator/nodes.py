@@ -33,6 +33,8 @@ from src.models.human_review import HumanReviewRequest, HumanReviewResponse
 from src.models.risk import IndustryContext, RiskAssessment
 from src.orchestrator.state import UnderwritingState
 from src.pipeline.report_formatter import format_underwriting_report
+from src.tools.document_router import route_document
+from src.tools.document_tools import classify_document, extract_document_data
 from src.tools.fetch_tools import (
     pull_borrower_data,
     pull_credit_report,
@@ -45,13 +47,28 @@ from src.tools.compliance_tools import (
 )
 from src.tools.policy_tools_v2 import verify_compliance_requirement
 from src.tools.underwriting_tools import calculate_dti, calculate_ltv
+from src.utils.circuit_breaker import ALL_BREAKERS, bedrock_breaker
+from src.utils.error_types import StructuredError, categorize_pipeline_errors
+from src.utils.metrics import PipelineMetrics
+from src.utils.retry import retry_with_backoff
 
 
+@retry_with_backoff(
+    max_retries=2,
+    base_delay=0.4,
+    max_delay=4.0,
+    retryable_exceptions=(TimeoutError, ConnectionError),
+    jitter=True,
+)
 def _invoke_agent(agent: Any, prompt: str) -> str:
     """Invoke a LangChain agent with the messages payload shape used in this repo."""
-    result = agent.invoke(
-        {"messages": [{"role": "user", "content": prompt}]}
+    result = bedrock_breaker.call(
+        agent.invoke,
+        {"messages": [{"role": "user", "content": prompt}]},
     )
+
+    if isinstance(result, dict) and result.get("error") == "bedrock_circuit_open":
+        raise RuntimeError("bedrock_circuit_open")
 
     messages = result.get("messages", []) if isinstance(result, dict) else []
     if messages:
@@ -79,6 +96,32 @@ def _invoke_agent(agent: Any, prompt: str) -> str:
 
 def _now_iso() -> str:
     return datetime.now(UTC).isoformat()
+
+
+def _append_error(errors: list[str], error: StructuredError) -> None:
+    errors.append(error.to_state_string())
+
+
+def _metrics_from_state(state: UnderwritingState) -> PipelineMetrics:
+    app_id = state.get("app_id", "UNKNOWN")
+    metrics = PipelineMetrics(evaluation_id=str(app_id))
+    prior = state.get("metrics_summary") or {}
+    for node_name, node_data in (prior.get("node_metrics") or {}).items():
+        metrics.start_node(node_name)
+        metrics.end_node(
+            node_name,
+            status=str(node_data.get("status", "success")),
+            llm_calls=int(node_data.get("llm_calls", 0) or 0),
+            tokens_in=int(node_data.get("tokens_in", 0) or 0),
+            tokens_out=int(node_data.get("tokens_out", 0) or 0),
+            tools_called=list(node_data.get("tools_called", [])),
+            errors=list(node_data.get("errors", [])),
+            retries=int(node_data.get("retries", 0) or 0),
+            cost_estimate_usd=float(node_data.get("cost_estimate_usd", 0.0) or 0.0),
+        )
+    for err in prior.get("pipeline_errors", []) or []:
+        metrics.record_pipeline_error(str(err))
+    return metrics
 
 
 def _stamp_node(state: UnderwritingState, node_name: str, started_at: float) -> dict[str, Any]:
@@ -184,6 +227,8 @@ def fetch_data_node(state: UnderwritingState) -> dict[str, Any]:
     """Run the FetchData agent and assemble a structured borrower package."""
     started_at = time.perf_counter()
     errors = list(state.get("errors", []))
+    metrics = _metrics_from_state(state)
+    metrics.start_node("fetch_data")
     try:
         app_id = state.get("app_id", "")
         agent_summary = ""
@@ -192,7 +237,14 @@ def fetch_data_node(state: UnderwritingState) -> dict[str, Any]:
             agent = create_fetch_data_agent()
             agent_summary = _invoke_agent(agent, f"Gather all underwriting data for {app_id}.")
         except Exception as exc:
-            errors.append(f"fetch_data_agent_failed: {exc}")
+            _append_error(
+                errors,
+                StructuredError.recoverable(
+                    source="fetch_data_agent",
+                    message="FetchData agent call failed; continuing with deterministic tools.",
+                    exc=exc,
+                ),
+            )
 
         try:
             borrower_raw = pull_borrower_data.invoke({"app_id": app_id})
@@ -209,8 +261,22 @@ def fetch_data_node(state: UnderwritingState) -> dict[str, Any]:
             missing: list[str] = []
             if isinstance(credit_raw, dict) and credit_raw.get("error"):
                 missing.append("credit")
+                _append_error(
+                    errors,
+                    StructuredError.recoverable(
+                        source="pull_credit_report",
+                        message=str(credit_raw.get("error")),
+                    ),
+                )
             if isinstance(employment_raw, dict) and employment_raw.get("error"):
                 missing.append("employment")
+                _append_error(
+                    errors,
+                    StructuredError.recoverable(
+                        source="pull_employment_history",
+                        message=str(employment_raw.get("error")),
+                    ),
+                )
 
             quality = "COMPLETE"
             if missing:
@@ -232,11 +298,26 @@ def fetch_data_node(state: UnderwritingState) -> dict[str, Any]:
                 fetch_timestamp="pipeline_fetch_node",
             )
 
+            metrics.end_node(
+                "fetch_data",
+                status="degraded" if missing else "success",
+                llm_calls=1 if agent_summary else 0,
+                tools_called=[
+                    "pull_borrower_data",
+                    "pull_credit_report",
+                    "pull_employment_history",
+                    "search_lending_policies",
+                ],
+                errors=errors,
+                cost_estimate_usd=0.0012,
+            )
+
             return {
                 "borrower_package": package.model_dump(),
                 "has_documents": bool(state.get("document_paths")),
                 "fatal_error": False,
                 "errors": errors,
+                "metrics_summary": metrics.summary(),
                 **_stamp_node(state, "fetch_data", started_at),
                 "messages": [
                     (
@@ -248,22 +329,45 @@ def fetch_data_node(state: UnderwritingState) -> dict[str, Any]:
                 ],
             }
         except Exception as exc:
-            errors.append(f"fetch_data_failed: {exc}")
+            _append_error(
+                errors,
+                StructuredError.fatal(
+                    source="fetch_data_node",
+                    message="Unable to assemble borrower package.",
+                    exc=exc,
+                ),
+            )
+            metrics.end_node(
+                "fetch_data",
+                status="failed",
+                tools_called=["pull_borrower_data", "pull_credit_report", "pull_employment_history"],
+                errors=errors,
+            )
             return {
                 "borrower_package": None,
                 "has_documents": bool(state.get("document_paths")),
                 "fatal_error": True,
                 "errors": errors,
+                "metrics_summary": metrics.summary(),
                 **_stamp_node(state, "fetch_data", started_at),
                 "messages": [("assistant", f"FetchData failed: {exc}")],
             }
     except Exception as exc:
-        errors.append(f"fetch_data_unhandled_error: {exc}")
+        _append_error(
+            errors,
+            StructuredError.fatal(
+                source="fetch_data_node",
+                message="Unhandled error in fetch_data_node.",
+                exc=exc,
+            ),
+        )
+        metrics.end_node("fetch_data", status="failed", errors=errors)
         return {
             "borrower_package": None,
             "has_documents": bool(state.get("document_paths")),
             "fatal_error": True,
             "errors": errors,
+            "metrics_summary": metrics.summary(),
             **_stamp_node(state, "fetch_data", started_at),
             "messages": [("assistant", f"FetchData unhandled error: {exc}")],
         }
@@ -273,6 +377,8 @@ def doc_review_node(state: UnderwritingState) -> dict[str, Any]:
     """Run the Doc Review agent and store a review package summary."""
     started_at = time.perf_counter()
     errors = list(state.get("errors", []))
+    metrics = _metrics_from_state(state)
+    metrics.start_node("doc_review")
     try:
         docs = state.get("document_paths", []) or []
         required = {
@@ -306,9 +412,11 @@ def doc_review_node(state: UnderwritingState) -> dict[str, Any]:
                 "total_issues": len(missing),
                 "agent_summary": "No documents provided.",
             }
+            metrics.end_node("doc_review", status="success", errors=errors)
             return {
                 "document_review": skipped_review,
                 "errors": errors,
+                "metrics_summary": metrics.summary(),
                 **_stamp_node(state, "doc_review", started_at),
                 "messages": [("assistant", "Document Review skipped (no documents provided).")],
             }
@@ -319,11 +427,65 @@ def doc_review_node(state: UnderwritingState) -> dict[str, Any]:
             prompt = "Review these loan documents:\n" + "\n".join(f"- {path}" for path in docs)
             agent_summary = _invoke_agent(agent, prompt)
         except Exception as exc:
-            errors.append(f"doc_review_agent_failed: {exc}")
+            _append_error(
+                errors,
+                StructuredError.recoverable(
+                    source="doc_review_agent",
+                    message="Doc review agent failed; continuing deterministic extraction.",
+                    exc=exc,
+                ),
+            )
 
         try:
             lowered = " ".join(path.lower() for path in docs)
             missing: list[dict[str, str]] = []
+
+            classifications: list[dict[str, Any]] = []
+            extractions: list[dict[str, Any]] = []
+            methods_used: list[dict[str, str]] = []
+            total_extraction_cost = 0.0
+
+            for path in docs:
+                cls = classify_document.invoke({"document_path": path})
+                classifications.append(cls)
+
+                normalized_type = str(cls.get("document_type", "OTHER")).lower()
+                route = route_document(path, declared_document_type=normalized_type)
+                preferred_method = route.get("primary_method", "vision")
+
+                extraction = None
+                if normalized_type in {"w2", "1040", "paystub"}:
+                    extraction = extract_document_data.invoke(
+                        {
+                            "document_path": path,
+                            "document_type": normalized_type,
+                            "preferred_method": preferred_method,
+                        }
+                    )
+
+                    # Textract fallback to vision when confidence is low.
+                    confidence = str((extraction or {}).get("extracted_data", {}).get("confidence", ""))
+                    if (
+                        preferred_method == "textract"
+                        and extraction
+                        and "error" not in extraction
+                        and confidence == "LOW"
+                    ):
+                        extraction = extract_document_data.invoke(
+                            {
+                                "document_path": path,
+                                "document_type": normalized_type,
+                                "preferred_method": "vision",
+                            }
+                        )
+
+                if extraction and "error" not in extraction:
+                    extractions.append(extraction)
+                    used_method = str(extraction.get("metadata", {}).get("processing_method", preferred_method))
+                    methods_used.append({"file_path": path, "method": used_method})
+                    total_extraction_cost += float(extraction.get("metadata", {}).get("estimated_cost_usd", 0.0) or 0.0)
+                else:
+                    methods_used.append({"file_path": path, "method": preferred_method})
 
             if "w2" not in lowered:
                 missing.append({"document_type": "W2", "reason_required": required["W2"], "impact": "Cannot verify historical wages."})
@@ -340,16 +502,8 @@ def doc_review_node(state: UnderwritingState) -> dict[str, Any]:
 
             review = {
                 "status": "COMPLETED",
-                "documents_classified": [
-                    {
-                        "file_path": path,
-                        "document_type": "OTHER",
-                        "confidence": "LOW",
-                        "page_count": 1,
-                    }
-                    for path in docs
-                ],
-                "extractions": [],
+                "documents_classified": classifications,
+                "extractions": extractions,
                 "validations": [],
                 "missing_documents": missing,
                 "missing_document_flags": {
@@ -361,22 +515,42 @@ def doc_review_node(state: UnderwritingState) -> dict[str, Any]:
                 "total_documents": len(docs),
                 "total_issues": len(missing),
                 "agent_summary": agent_summary,
+                "extraction_methods": methods_used,
+                "estimated_extraction_cost_usd": round(total_extraction_cost, 6),
             }
+
+            metrics.end_node(
+                "doc_review",
+                status="degraded" if missing else "success",
+                llm_calls=1 if agent_summary else 0,
+                tools_called=["classify_document", "extract_document_data", "validate_document_package"],
+                errors=errors,
+                cost_estimate_usd=round(total_extraction_cost, 6),
+            )
 
             return {
                 "document_review": review,
                 "errors": errors,
+                "metrics_summary": metrics.summary(),
                 **_stamp_node(state, "doc_review", started_at),
                 "messages": [
                     (
                         "assistant",
                         "Document Review complete. "
-                        f"quality={quality}, missing_docs={len(missing)}.",
+                        f"quality={quality}, missing_docs={len(missing)}, methods={methods_used}.",
                     )
                 ],
             }
         except Exception as exc:
-            errors.append(f"doc_review_failed: {exc}")
+            _append_error(
+                errors,
+                StructuredError.degraded(
+                    source="doc_review_node",
+                    message="Document review degraded due to extraction error.",
+                    exc=exc,
+                ),
+            )
+            metrics.end_node("doc_review", status="failed", errors=errors)
             return {
                 "document_review": {
                     "status": "FAILED",
@@ -391,11 +565,20 @@ def doc_review_node(state: UnderwritingState) -> dict[str, Any]:
                     "agent_summary": "",
                 },
                 "errors": errors,
+                "metrics_summary": metrics.summary(),
                 **_stamp_node(state, "doc_review", started_at),
                 "messages": [("assistant", f"Document Review failed: {exc}")],
             }
     except Exception as exc:
-        errors.append(f"doc_review_unhandled_error: {exc}")
+        _append_error(
+            errors,
+            StructuredError.degraded(
+                source="doc_review_node",
+                message="Unhandled doc review error.",
+                exc=exc,
+            ),
+        )
+        metrics.end_node("doc_review", status="failed", errors=errors)
         return {
             "document_review": {
                 "status": "FAILED",
@@ -410,6 +593,7 @@ def doc_review_node(state: UnderwritingState) -> dict[str, Any]:
                 "agent_summary": "",
             },
             "errors": errors,
+            "metrics_summary": metrics.summary(),
             **_stamp_node(state, "doc_review", started_at),
             "messages": [("assistant", f"Document Review unhandled error: {exc}")],
         }
@@ -419,6 +603,8 @@ def risk_scoring_node(state: UnderwritingState) -> dict[str, Any]:
     """Run the Risk Scoring agent and generate a structured risk assessment."""
     started_at = time.perf_counter()
     errors = list(state.get("errors", []))
+    metrics = _metrics_from_state(state)
+    metrics.start_node("risk_scoring")
     try:
         borrower_package = state.get("borrower_package")
         document_review = state.get("document_review")
@@ -426,11 +612,19 @@ def risk_scoring_node(state: UnderwritingState) -> dict[str, Any]:
 
         if not borrower_package:
             msg = "Risk Scoring skipped: borrower_package missing."
-            errors.append("risk_scoring_skipped_missing_borrower_package")
+            _append_error(
+                errors,
+                StructuredError.degraded(
+                    source="risk_scoring_node",
+                    message="Borrower package missing; risk scoring skipped.",
+                ),
+            )
+            metrics.end_node("risk_scoring", status="degraded", errors=errors)
             return {
                 "risk_assessment": None,
                 "needs_manual_review": not bool(state.get("fatal_error", False)),
                 "errors": errors,
+                "metrics_summary": metrics.summary(),
                 **_stamp_node(state, "risk_scoring", started_at),
                 "messages": [("assistant", msg)],
             }
@@ -444,7 +638,14 @@ def risk_scoring_node(state: UnderwritingState) -> dict[str, Any]:
             )
             agent_summary = _invoke_agent(agent, prompt)
         except Exception as exc:
-            errors.append(f"risk_scoring_agent_failed: {exc}")
+            _append_error(
+                errors,
+                StructuredError.recoverable(
+                    source="risk_scoring_agent",
+                    message="Risk scoring agent call failed; continuing deterministic scoring.",
+                    exc=exc,
+                ),
+            )
 
         try:
             annual_income = borrower_package["borrower"]["annual_income"]
@@ -494,10 +695,20 @@ def risk_scoring_node(state: UnderwritingState) -> dict[str, Any]:
             risk_payload = assessment.model_dump()
             risk_payload["agent_summary"] = agent_summary
 
+            metrics.end_node(
+                "risk_scoring",
+                status="success",
+                llm_calls=1 if agent_summary else 0,
+                tools_called=["calculate_dti", "calculate_ltv"],
+                errors=errors,
+                cost_estimate_usd=0.0012,
+            )
+
             return {
                 "risk_assessment": risk_payload,
                 "needs_manual_review": assessment.recommendation in {"MANUAL_REVIEW", "DENY"},
                 "errors": errors,
+                "metrics_summary": metrics.summary(),
                 **_stamp_node(state, "risk_scoring", started_at),
                 "messages": [
                     (
@@ -508,20 +719,38 @@ def risk_scoring_node(state: UnderwritingState) -> dict[str, Any]:
                 ],
             }
         except Exception as exc:
-            errors.append(f"risk_scoring_failed: {exc}")
+            _append_error(
+                errors,
+                StructuredError.degraded(
+                    source="risk_scoring_node",
+                    message="Risk scoring failed; routing to manual review.",
+                    exc=exc,
+                ),
+            )
+            metrics.end_node("risk_scoring", status="failed", errors=errors)
             return {
                 "risk_assessment": None,
                 "needs_manual_review": True,
                 "errors": errors,
+                "metrics_summary": metrics.summary(),
                 **_stamp_node(state, "risk_scoring", started_at),
                 "messages": [("assistant", f"Risk Scoring failed: {exc}")],
             }
     except Exception as exc:
-        errors.append(f"risk_scoring_unhandled_error: {exc}")
+        _append_error(
+            errors,
+            StructuredError.degraded(
+                source="risk_scoring_node",
+                message="Unhandled risk scoring error.",
+                exc=exc,
+            ),
+        )
+        metrics.end_node("risk_scoring", status="failed", errors=errors)
         return {
             "risk_assessment": None,
             "needs_manual_review": True,
             "errors": errors,
+            "metrics_summary": metrics.summary(),
             **_stamp_node(state, "risk_scoring", started_at),
             "messages": [("assistant", f"Risk Scoring unhandled error: {exc}")],
         }
@@ -531,8 +760,11 @@ def compliance_node(state: UnderwritingState) -> dict[str, Any]:
     """Run compliance validation using deterministic and RAG-backed checks."""
     started_at = time.perf_counter()
     errors = list(state.get("errors", []))
+    metrics = _metrics_from_state(state)
+    metrics.start_node("compliance")
     try:
         if state.get("fatal_error"):
+            metrics.end_node("compliance", status="degraded", errors=errors)
             return {
                 "compliance_result": {
                     "required_disclosures": [],
@@ -545,6 +777,7 @@ def compliance_node(state: UnderwritingState) -> dict[str, Any]:
                 },
                 "needs_manual_review": False,
                 "errors": errors,
+                "metrics_summary": metrics.summary(),
                 **_stamp_node(state, "compliance", started_at),
                 "messages": [("assistant", "Compliance skipped due to fatal error.")],
             }
@@ -565,7 +798,14 @@ def compliance_node(state: UnderwritingState) -> dict[str, Any]:
             )
             agent_summary = _invoke_agent(agent, prompt)
         except Exception as exc:
-            errors.append(f"compliance_agent_failed: {exc}")
+            _append_error(
+                errors,
+                StructuredError.recoverable(
+                    source="compliance_agent",
+                    message="Compliance agent call failed; continuing deterministic checks.",
+                    exc=exc,
+                ),
+            )
 
         disclosures = check_disclosure_requirements.invoke(
             {
@@ -593,7 +833,14 @@ def compliance_node(state: UnderwritingState) -> dict[str, Any]:
                 legal_check = "Skipped critical legal verification for non-escalated decision."
         except Exception as exc:
             legal_check = f"Legal verification unavailable: {exc}"
-            errors.append(f"compliance_rag_failed: {exc}")
+            _append_error(
+                errors,
+                StructuredError.recoverable(
+                    source="verify_compliance_requirement",
+                    message="Legal verification unavailable.",
+                    exc=exc,
+                ),
+            )
 
         fair_lending_flag = "discrimin" in str(legal_check).lower()
         recommendation_override = "NONE"
@@ -634,15 +881,33 @@ def compliance_node(state: UnderwritingState) -> dict[str, Any]:
         if recommendation_override == "MANUAL_REVIEW":
             needs_manual_review = True
 
+        metrics.end_node(
+            "compliance",
+            status="degraded" if recommendation_override == "MANUAL_REVIEW" else "success",
+            llm_calls=1 if agent_summary else 0,
+            tools_called=["check_disclosure_requirements", "verify_audit_trail", "verify_compliance_requirement"],
+            errors=errors,
+            cost_estimate_usd=0.0015,
+        )
+
         return {
             "compliance_result": payload,
             "needs_manual_review": needs_manual_review,
             "errors": errors,
+            "metrics_summary": metrics.summary(),
             **_stamp_node(state, "compliance", started_at),
             "messages": [("assistant", result.summary)],
         }
     except Exception as exc:
-        errors.append(f"compliance_failed: {exc}")
+        _append_error(
+            errors,
+            StructuredError.degraded(
+                source="compliance_node",
+                message="Compliance node failed.",
+                exc=exc,
+            ),
+        )
+        metrics.end_node("compliance", status="failed", errors=errors)
         return {
             "compliance_result": {
                 "required_disclosures": [],
@@ -655,6 +920,7 @@ def compliance_node(state: UnderwritingState) -> dict[str, Any]:
             },
             "needs_manual_review": True,
             "errors": errors,
+            "metrics_summary": metrics.summary(),
             **_stamp_node(state, "compliance", started_at),
             "messages": [("assistant", f"Compliance failed: {exc}")],
         }
@@ -664,6 +930,8 @@ def fha_compliance_node(state: UnderwritingState) -> dict[str, Any]:
     """Run FHA-specific pre-compliance checks before standard compliance."""
     started_at = time.perf_counter()
     errors = list(state.get("errors", []))
+    metrics = _metrics_from_state(state)
+    metrics.start_node("fha_compliance")
     risk = state.get("risk_assessment") or {}
     borrower = (state.get("borrower_package") or {}).get("borrower", {})
 
@@ -693,15 +961,29 @@ def fha_compliance_node(state: UnderwritingState) -> dict[str, Any]:
         }
 
         needs_manual_review = bool(state.get("needs_manual_review", False)) or bool(flags)
+        metrics.end_node(
+            "fha_compliance",
+            status="degraded" if flags else "success",
+            errors=errors,
+        )
         return {
             "fha_compliance_result": result,
             "needs_manual_review": needs_manual_review,
             "errors": errors,
+            "metrics_summary": metrics.summary(),
             **_stamp_node(state, "fha_compliance", started_at),
             "messages": [("assistant", result["summary"])],
         }
     except Exception as exc:
-        errors.append(f"fha_compliance_failed: {exc}")
+        _append_error(
+            errors,
+            StructuredError.degraded(
+                source="fha_compliance_node",
+                message="FHA-specific compliance checks failed.",
+                exc=exc,
+            ),
+        )
+        metrics.end_node("fha_compliance", status="failed", errors=errors)
         return {
             "fha_compliance_result": {
                 "status": "REVIEW",
@@ -710,6 +992,7 @@ def fha_compliance_node(state: UnderwritingState) -> dict[str, Any]:
             },
             "needs_manual_review": True,
             "errors": errors,
+            "metrics_summary": metrics.summary(),
             **_stamp_node(state, "fha_compliance", started_at),
             "messages": [("assistant", f"FHA checks failed: {exc}")],
         }
@@ -719,13 +1002,24 @@ def fatal_error_node(state: UnderwritingState) -> dict[str, Any]:
     """Consolidate fatal pipeline errors before final decision output."""
     started_at = time.perf_counter()
     errors = list(state.get("errors", []))
+    metrics = _metrics_from_state(state)
+    metrics.start_node("fatal_error")
     if not errors:
-        errors.append("fatal_error_node_reached_without_error_context")
+        _append_error(
+            errors,
+            StructuredError.fatal(
+                source="fatal_error_node",
+                message="Fatal error node reached without prior error context.",
+            ),
+        )
+
+    metrics.end_node("fatal_error", status="failed", errors=errors)
 
     return {
         "fatal_error": True,
         "needs_manual_review": True,
         "errors": errors,
+        "metrics_summary": metrics.summary(),
         **_stamp_node(state, "fatal_error", started_at),
         "messages": [
             (
@@ -740,6 +1034,8 @@ def human_review_node(state: UnderwritingState) -> dict[str, Any]:
     """Pause for human decision and persist response on resume."""
     started_at = time.perf_counter()
     errors = list(state.get("errors", []))
+    metrics = _metrics_from_state(state)
+    metrics.start_node("human_review")
     risk = state.get("risk_assessment") or {}
     compliance = state.get("compliance_result") or {}
     borrower_package = state.get("borrower_package") or {}
@@ -850,7 +1146,14 @@ def human_review_node(state: UnderwritingState) -> dict[str, Any]:
     try:
         response = HumanReviewResponse.model_validate(normalized)
     except ValidationError as exc:
-        errors.append(f"human_review_validation_failed: {exc}")
+        _append_error(
+            errors,
+            StructuredError.degraded(
+                source="human_review_node",
+                message="Human review response validation failed; default decision applied.",
+                exc=exc,
+            ),
+        )
         response = HumanReviewResponse(
             decision="DENY",
             conditions=[],
@@ -863,6 +1166,12 @@ def human_review_node(state: UnderwritingState) -> dict[str, Any]:
     if needs_additional_data:
         current_iterations += 1
 
+    metrics.end_node(
+        "human_review",
+        status="degraded" if needs_additional_data else "success",
+        errors=errors,
+    )
+
     return {
         "human_review_request": request.model_dump(),
         "human_review_response": response.model_dump(),
@@ -871,6 +1180,7 @@ def human_review_node(state: UnderwritingState) -> dict[str, Any]:
         "additional_data_request": additional_data_request,
         "review_iterations": current_iterations,
         "errors": errors,
+        "metrics_summary": metrics.summary(),
         **_stamp_node(state, "human_review", started_at),
         "messages": [
             (
@@ -888,6 +1198,8 @@ def human_review_node(state: UnderwritingState) -> dict[str, Any]:
 def final_decision_node(state: UnderwritingState) -> dict[str, Any]:
     """Create a complete, audit-ready underwriting report."""
     started_at = time.perf_counter()
+    metrics = _metrics_from_state(state)
+    metrics.start_node("final_decision")
     app_id = state.get("app_id", "UNKNOWN")
     borrower_package = state.get("borrower_package")
     document_review = state.get("document_review")
@@ -898,6 +1210,7 @@ def final_decision_node(state: UnderwritingState) -> dict[str, Any]:
     additional_data_request = state.get("additional_data_request")
     review_iterations = int(state.get("review_iterations", 0) or 0)
     errors = state.get("errors", [])
+    categorized_errors = categorize_pipeline_errors(list(errors))
 
     borrower_summary = "Borrower data unavailable"
     if borrower_package:
@@ -963,6 +1276,18 @@ def final_decision_node(state: UnderwritingState) -> dict[str, Any]:
 
     thread_id = str(state.get("thread_id", ""))
     tool_calls, llm_calls, estimated_cost = _estimate_usage_counts(state)
+    circuit_states = {name: breaker.status() for name, breaker in ALL_BREAKERS.items()}
+    guardrails_intervened = any("guardrail" in str(err).lower() for err in errors)
+
+    metrics.end_node(
+        "final_decision",
+        status="success" if not state.get("fatal_error") else "failed",
+        llm_calls=0,
+        tools_called=[],
+        errors=list(errors),
+        cost_estimate_usd=estimated_cost,
+    )
+    metrics_summary = metrics.summary()
 
     stitched_state = dict(state)
     stitched_state.update(
@@ -981,6 +1306,10 @@ def final_decision_node(state: UnderwritingState) -> dict[str, Any]:
             "additional_data_request": additional_data_request,
             "review_iterations": review_iterations,
             "thread_id": thread_id,
+            "error_categories": categorized_errors,
+            "circuit_breaker_states": circuit_states,
+            "guardrails_intervened": guardrails_intervened,
+            "metrics_summary": metrics_summary,
         }
     )
 
@@ -992,6 +1321,10 @@ def final_decision_node(state: UnderwritingState) -> dict[str, Any]:
         "total_tool_calls": tool_calls,
         "total_llm_calls": llm_calls,
         "estimated_cost_usd": estimated_cost,
+        "error_categories": categorized_errors,
+        "circuit_breaker_states": circuit_states,
+        "guardrails_intervened": guardrails_intervened,
+        "metrics_summary": metrics_summary,
         **_stamp_node(state, "final_decision", started_at),
         "messages": [("assistant", "Final decision report generated.")],
     }

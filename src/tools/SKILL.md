@@ -275,3 +275,27 @@ FAISS (file exists), OpenSearch (`/_cluster/health`), all circuit-breaker states
 - `src/tools/graph_tools._query_similar_loans` — same
 - `src/tools/graph_tools._query_state_regulations` — same
 - `get_borrower_risk_context` / `find_similar_past_loans` / `get_state_regulations` — all route through `neo4j_breaker`
+
+## External Call Hardening Coverage
+
+Additional hardened call paths:
+
+- `src/tools/fetch_tools.pull_credit_report`
+  - retry on transient timeout/connection exceptions
+  - wrapped with `credit_bureau_breaker`
+  - fallback returns structured `UNVERIFIED`/degraded payload
+
+- `src/tools/fetch_tools.pull_employment_history`
+  - retry on transient timeout/connection exceptions
+  - wrapped with `employment_breaker`
+  - fallback returns structured degraded payload
+
+- `src/tools/policy_tools._search_with_rebuild_on_mismatch`
+  - retry around vector similarity search
+  - wrapped with `opensearch_breaker`
+  - fallback returns empty results (degraded retrieval)
+
+- `src/rag/smart_rag.SmartRAG._retrieve`
+  - retry around similarity search
+  - wrapped with `opensearch_breaker`
+  - fallback returns empty retrieval set and logs degraded status

@@ -19,8 +19,8 @@ in ``ALL_BREAKERS`` so operators can see which external services are tripped.
 
 from __future__ import annotations
 
-import json
 import logging
+import os
 import time
 import urllib.request
 from typing import Any
@@ -32,16 +32,13 @@ logger = logging.getLogger(__name__)
 
 
 def _check_bedrock() -> dict[str, Any]:
-    """Probe AWS Bedrock by listing foundation models (read-only, no tokens used)."""
+    """Probe Bedrock runtime with a tiny prompt to validate invoke path."""
     try:
-        import boto3  # type: ignore[import]
-        from botocore.exceptions import BotoCoreError, ClientError  # type: ignore[import]
+        from src.config.bedrock import create_llm
 
-        from src.config.settings import settings
-
+        llm = create_llm(task="default", max_tokens=16)
         t0 = time.perf_counter()
-        client = boto3.client("bedrock", region_name=settings.aws_region)
-        client.list_foundation_models(maxResults=1)
+        llm.invoke("Reply with: ok")
         latency_ms = round((time.perf_counter() - t0) * 1000, 2)
         return {"status": "healthy", "latency_ms": latency_ms}
     except Exception as exc:
@@ -50,7 +47,7 @@ def _check_bedrock() -> dict[str, Any]:
 
 
 def _check_neo4j() -> dict[str, Any]:
-    """Probe Neo4j with a driver connectivity verification (no query executed)."""
+    """Probe Neo4j by running a simple read query."""
     try:
         from neo4j import GraphDatabase  # type: ignore[import]
 
@@ -61,7 +58,8 @@ def _check_neo4j() -> dict[str, Any]:
             settings.neo4j_uri,
             auth=(settings.neo4j_user, settings.neo4j_password),
         )
-        driver.verify_connectivity()
+        with driver.session() as session:
+            session.run("RETURN 1 AS ok").single()
         driver.close()
         latency_ms = round((time.perf_counter() - t0) * 1000, 2)
         return {"status": "healthy", "latency_ms": latency_ms}
@@ -71,17 +69,14 @@ def _check_neo4j() -> dict[str, Any]:
 
 
 def _check_faiss() -> dict[str, Any]:
-    """Verify the primary FAISS vector-store index file is readable on disk."""
+    """Verify FAISS is queryable with a trivial search."""
     try:
-        from pathlib import Path
+        from src.rag.vectorstore import search_policies
 
-        index_path = Path("data/vectorstore/index.faiss")
-        if index_path.exists():
-            return {"status": "healthy", "index_path": str(index_path)}
-        return {
-            "status": "degraded",
-            "detail": "FAISS index not found — will rebuild on first query.",
-        }
+        t0 = time.perf_counter()
+        docs = search_policies("DTI", top_k=1)
+        latency_ms = round((time.perf_counter() - t0) * 1000, 2)
+        return {"status": "healthy", "latency_ms": latency_ms, "results": len(docs)}
     except Exception as exc:
         logger.warning("[health_check] faiss probe failed: %s", exc)
         return {"status": "unhealthy", "error": str(exc)}
@@ -95,8 +90,6 @@ def _check_opensearch() -> dict[str, Any]:
     OpenSearch is not a critical dependency for the default pipeline path.
     """
     try:
-        import os
-
         endpoint = os.environ.get("OPENSEARCH_ENDPOINT", "").rstrip("/")
         if not endpoint:
             return {
@@ -107,10 +100,14 @@ def _check_opensearch() -> dict[str, Any]:
         url = f"{endpoint}/_cluster/health"
         t0 = time.perf_counter()
         with urllib.request.urlopen(url, timeout=5) as resp:  # noqa: S310
-            body: dict[str, Any] = json.loads(resp.read())
+            body = resp.read().decode("utf-8")
         latency_ms = round((time.perf_counter() - t0) * 1000, 2)
 
-        cluster_status = body.get("status", "unknown")
+        cluster_status = "green"
+        if '"status":"yellow"' in body:
+            cluster_status = "yellow"
+        elif '"status":"red"' in body:
+            cluster_status = "red"
         if cluster_status == "red":
             return {"status": "unhealthy", "cluster_status": cluster_status, "latency_ms": latency_ms}
         if cluster_status == "yellow":
@@ -119,6 +116,25 @@ def _check_opensearch() -> dict[str, Any]:
 
     except Exception as exc:
         logger.warning("[health_check] opensearch probe failed: %s", exc)
+        return {"status": "unhealthy", "error": str(exc)}
+
+
+def _check_redis() -> dict[str, Any]:
+    """Ping Redis when configured; returns degraded if not configured."""
+    redis_url = os.environ.get("REDIS_URL", "").strip()
+    if not redis_url:
+        return {"status": "degraded", "detail": "REDIS_URL not configured."}
+
+    try:
+        import redis  # type: ignore[import]
+
+        t0 = time.perf_counter()
+        client = redis.from_url(redis_url)
+        pong = client.ping()
+        latency_ms = round((time.perf_counter() - t0) * 1000, 2)
+        return {"status": "healthy" if pong else "unhealthy", "latency_ms": latency_ms}
+    except Exception as exc:
+        logger.warning("[health_check] redis probe failed: %s", exc)
         return {"status": "unhealthy", "error": str(exc)}
 
 
@@ -174,6 +190,7 @@ def check_all_dependencies() -> dict[str, Any]:
         "neo4j": _check_neo4j(),
         "faiss": _check_faiss(),
         "opensearch": _check_opensearch(),
+        "redis": _check_redis(),
     }
     circuit_breakers = _check_circuit_breakers()
 
