@@ -19,7 +19,7 @@ The Document Review agent runs on Sonnet because it needs vision capabilities. I
 
 The Risk Scoring agent runs on Haiku and combines three data sources (calculations, RAG, knowledge graph). It is the most tool-heavy agent (8 tools) but its tools are clearly differentiated — math functions, policy search, and graph queries have zero docstring overlap. Its failure mode is knowledge graph unavailability or RAG retrieval quality. If the graph is down, it still scores using calculations and RAG — graceful degradation within its boundary.
 
-The Compliance agent runs on Sonnet because legal reasoning requires stronger model capabilities. It has veto power — it can override Risk Scoring's APPROVE to MANUAL_REVIEW if it finds a regulatory violation. This separation is not just technical but organizational — at Goldman, the compliance function is deliberately independent from the risk function. The agent boundary enforces this separation of concerns.
+The Compliance agent runs on Sonnet because legal reasoning requires stronger model capabilities. It has veto power — it can override Risk Scoring's APPROVE to MANUAL_REVIEW if it finds a regulatory violation. This separation is not just technical but organizational — at the company, the compliance function is deliberately independent from the risk function. The agent boundary enforces this separation of concerns.
 
 ### 1.2 Parallel Execution: Where the Time Savings Come From
 
@@ -61,7 +61,7 @@ This philosophy matches real underwriting. A human underwriter does not stop wor
 
 ### 2.1 The Complete Flow for a Typical Application
 
-A senior underwriter submits application APP-001 through the Camelot UI with two uploaded documents (W-2 and pay stub). Here is exactly what happens:
+A senior underwriter submits application APP-001 through the Kuber UI with two uploaded documents (W-2 and pay stub). Here is exactly what happens:
 
 **Initial state created:** app_id="APP-001", document_paths=["w2.png", "paystub.png"], all other fields null, errors empty.
 
@@ -81,7 +81,7 @@ A senior underwriter submits application APP-001 through the Camelot UI with two
 
 **human_review interrupts.** Builds review summary from risk_assessment and compliance_result. Calls interrupt() with the summary. State saved to checkpoint store. Graph pauses. API returns pending_review status.
 
-**Time passes.** Senior underwriter reviews in Camelot UI.
+**Time passes.** Senior underwriter reviews in Kuber UI.
 
 **Human responds.** "APPROVE WITH CONDITIONS — restructure to 80% LTV, require 6 months reserves documentation." API resumes graph with same thread_id.
 
@@ -142,7 +142,7 @@ This is well within the 15-second target. The primary bottleneck is Document Rev
 
 ### 3.3 Reliability Targets
 
-For Goldman production, the system should handle:
+For the company production, the system should handle:
 
 Node failures: graceful degradation, partial results with explicit gap documentation
 External API failures: retry with exponential backoff within each agent, fallback to cached data if available

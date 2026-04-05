@@ -23,7 +23,7 @@ Your underwriting agent approves a loan and needs the Servicing agent to set up 
 
 Your underwriting agent needs a property appraisal from an AMC agent. The result takes days — the AMC dispatches an appraiser, collects the report, returns the valuation.
 
-Goldman's Fraud Detection agent notices suspicious activity and needs to alert your underwriting agent mid-evaluation to pause processing.
+the company's Fraud Detection agent notices suspicious activity and needs to alert your underwriting agent mid-evaluation to pause processing.
 
 In all cases, agents are in DIFFERENT systems. Cannot share state. Cannot import functions. Need a communication protocol.
 
@@ -102,7 +102,7 @@ A single message can contain all three: explanation text, structured loan data, 
 
 Step 1 — Discovery: Your system fetches the Servicing agent's Agent Card from its well-known URL. The card says it has a skill "setup_loan_servicing" accepting loan details.
 
-Step 2 — Authentication: Your system obtains an OAuth token from PingFederate using scopes specified in the Agent Card. Standard OAuth — same as any Goldman service-to-service auth.
+Step 2 — Authentication: Your system obtains an OAuth token from PingFederate using scopes specified in the Agent Card. Standard OAuth — same as any the company service-to-service auth.
 
 Step 3 — Task creation: Your LangGraph final_decision_node sends a POST to the Servicing agent's /tasks endpoint with loan details. Regular HTTPS request from your Fargate service.
 
@@ -144,7 +144,7 @@ JDBC standardized database access. MCP standardizes tool access. A2A standardize
 
 ## 6. A2A vs EventBridge
 
-Goldman already has cross-service communication via EventBridge. How is A2A different?
+the company already has cross-service communication via EventBridge. How is A2A different?
 
 EventBridge is fire-and-forget event publishing. Service A publishes "loan approved." Any interested service consumes. No task lifecycle, no status tracking, no back-and-forth, no capability discovery. Like posting on a bulletin board.
 
@@ -162,7 +162,7 @@ No. Your agents are all in one LangGraph process. Internal communication via sha
 
 ### 7.2 When A2A Becomes Valuable
 
-When Goldman has multiple agent systems: Servicing team, Fraud team, Portfolio team each have their own agents needing to interact with yours. Standard protocol prevents ad-hoc integration chaos.
+When the company has multiple agent systems: Servicing team, Fraud team, Portfolio team each have their own agents needing to interact with yours. Standard protocol prevents ad-hoc integration chaos.
 
 When the mortgage industry has agents: AMCs, title companies, credit bureaus with their own agents. A2A is how your system interacts without custom integrations per partner.
 
@@ -192,7 +192,7 @@ Yes. Same principle as MCP. MCP standardizes tools/list and tools/call. A2A stan
 
 ### Q: How does authentication work between agents?
 
-Standard OAuth 2.0. The Agent Card specifies the token URL and required scopes. Your system obtains a token from PingFederate (or whatever the card specifies) and includes it in every request. Same service-to-service auth pattern Goldman already uses. The A2A protocol does not invent new auth — it references existing OAuth/OIDC standards.
+Standard OAuth 2.0. The Agent Card specifies the token URL and required scopes. Your system obtains a token from PingFederate (or whatever the card specifies) and includes it in every request. Same service-to-service auth pattern the company already uses. The A2A protocol does not invent new auth — it references existing OAuth/OIDC standards.
 
 ### Q: How many agents can one agent talk to?
 
@@ -216,7 +216,7 @@ No protocol limit. Your agent can connect to as many other agents as needed — 
 | EventBridge vs A2A | Fire-and-forget events vs task delegation with tracking | Bulletin board vs task assignment |
 | Agent registry | Directory where agents publish cards for discovery | DNS for agents |
 | Current state | Spec published April 2025, minimal adoption | Monitor, do not implement |
-| For your system | Not needed today, valuable when Goldman has multiple agent systems | Same as MCP trajectory |
+| For your system | Not needed today, valuable when the company has multiple agent systems | Same as MCP trajectory |
 """
 
 with open("week5_day2.md", "w") as f:

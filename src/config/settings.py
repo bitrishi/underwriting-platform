@@ -33,6 +33,8 @@ class Settings:
     bedrock_guardrail_version_risk: str
     bedrock_guardrail_id_compliance: str
     bedrock_guardrail_version_compliance: str
+    langchain_tracing_v2: str
+    langchain_project: str
     
     def __post_init__(self) -> None:
         """Validate settings after initialization."""
@@ -103,6 +105,8 @@ def load_settings() -> Settings:
         bedrock_guardrail_version_risk=os.getenv("BEDROCK_GUARDRAIL_VERSION_RISK", default_guardrail_version),
         bedrock_guardrail_id_compliance=os.getenv("BEDROCK_GUARDRAIL_ID_COMPLIANCE", default_guardrail_id),
         bedrock_guardrail_version_compliance=os.getenv("BEDROCK_GUARDRAIL_VERSION_COMPLIANCE", default_guardrail_version),
+        langchain_tracing_v2=os.getenv("LANGCHAIN_TRACING_V2", "false"),
+        langchain_project=os.getenv("LANGCHAIN_PROJECT", "underwriting-dev"),
     )
 
 
@@ -122,3 +126,5 @@ if __name__ == "__main__":
     print(f"  Is Production: {settings.is_production}")
     print(f"  Is Development: {settings.is_development}")
     print(f"  Is Staging: {settings.is_staging}")
+    print(f"  LangChain Tracing V2: {settings.langchain_tracing_v2}")
+    print(f"  LangChain Project: {settings.langchain_project}")

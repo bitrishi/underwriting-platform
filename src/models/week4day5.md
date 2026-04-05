@@ -13,7 +13,7 @@ md_content = """# Week 4, Day 5: Advanced LangGraph — Subgraphs, Streaming & D
 
 Your current orchestrator is a flat graph — all six nodes at the same level. As the system grows (more agents, more conditions, more loan types), this flat structure becomes hard to manage. Subgraphs solve this by nesting graphs inside nodes.
 
-Think of your Camelot architecture. You do not have one giant service with 200 endpoints. You have separate services (core, sync, dependency evaluator), each with their own internal logic. The outer system calls a service; the service internally handles its own complexity. A subgraph is the same principle — your orchestrator calls "risk_scoring" as one node, but internally risk_scoring is its own graph with multiple steps and conditional logic.
+Think of your Kuber architecture. You do not have one giant service with 200 endpoints. You have separate services (core, sync, dependency evaluator), each with their own internal logic. The outer system calls a service; the service internally handles its own complexity. A subgraph is the same principle — your orchestrator calls "risk_scoring" as one node, but internally risk_scoring is its own graph with multiple steps and conditional logic.
 
 ### 1.2 When to Use Subgraphs
 
@@ -131,7 +131,7 @@ The entire LangGraph pipeline runs as ONE service on ECS Fargate. All nodes exec
 
 The Fargate container handles 100-200 concurrent evaluations. Auto-scale tasks based on queue depth. Zero cold start overhead. Zero serialization overhead between nodes.
 
-This is exactly how Camelot services run — long-running containers on Fargate, not individual Lambdas per endpoint.
+This is exactly how Kuber services run — long-running containers on Fargate, not individual Lambdas per endpoint.
 
 ### 6.3 When Lambda Per Node Does Make Sense
 
@@ -151,7 +151,7 @@ Partially. Three mechanisms cause agents to stop: max_iterations limit hit (safe
 
 ### Q: Should each node be a Lambda?
 
-No for most cases. Cold starts add 2-15s overhead. State transfer adds latency. Dependencies are duplicated. The recommended architecture: one ECS Fargate service running the full pipeline, all nodes in-process, Redis for crash recovery. Extract individual nodes as separate services only if they become bottlenecks. Same pattern as Camelot services.
+No for most cases. Cold starts add 2-15s overhead. State transfer adds latency. Dependencies are duplicated. The recommended architecture: one ECS Fargate service running the full pipeline, all nodes in-process, Redis for crash recovery. Extract individual nodes as separate services only if they become bottlenecks. Same pattern as Kuber services.
 
 ### Q: When should I extract a subgraph?
 
@@ -186,7 +186,7 @@ Version your graphs. Include graph_version in thread_id. Keep old graph definiti
 | Graph cycles | Edges that loop back for iteration | Retry/feedback loops |
 | max_iterations | Safety limit on cycles | Circuit breaker max retries |
 | Graph versioning | Version in thread_id, keep old definitions | Database migration strategy |
-| Single Fargate service | Full pipeline in one process | Camelot service architecture |
+| Single Fargate service | Full pipeline in one process | Kuber service architecture |
 | Lambda per node (avoid) | Separate function per step | Microfunction antipattern |
 """
 

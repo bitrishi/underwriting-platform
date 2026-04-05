@@ -231,7 +231,7 @@ Tools are regular Python functions — they can do anything: API calls, DB queri
 ```
 LLM (Bedrock): Only sends/receives text. Auth via IAM role.
 Your Tool Code: Uses YOUR credentials per service:
-  - Camelot API → OAuth 2.0 / PingFederate token
+    - Kuber API → OAuth 2.0 / PingFederate token
   - Credit Bureau → API key + mTLS certificate
   - Google Maps → API key from Secrets Manager
   - Neo4j → Username/password from Secrets Manager

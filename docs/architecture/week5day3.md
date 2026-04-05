@@ -15,7 +15,7 @@ Your underwriting agent processes SSNs, income data, and credit scores. Without 
 
 ### 1.2 Regulatory Requirement
 
-For Goldman production, guardrails are not optional. OCC, CFPB, and FDIC all expect financial institutions to have controls on AI systems. A system that processes real loans with real borrower data requires content safety enforcement at the infrastructure level, not just prompt-level instructions.
+For the company production, guardrails are not optional. OCC, CFPB, and FDIC all expect financial institutions to have controls on AI systems. A system that processes real loans with real borrower data requires content safety enforcement at the infrastructure level, not just prompt-level instructions.
 
 ---
 

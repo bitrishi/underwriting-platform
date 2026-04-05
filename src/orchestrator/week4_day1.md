@@ -32,7 +32,7 @@ The mental model: think of a flowchart where each box is a processing step (your
 
 ### 1.3 The AWS Step Functions Analogy
 
-You already use Step Functions for Camelot's loan origination workflows. LangGraph is the same concept applied to AI agents.
+You already use Step Functions for Kuber's loan origination workflows. LangGraph is the same concept applied to AI agents.
 
 Step Functions defines state machines in JSON/YAML with states (Task, Choice, Parallel, Wait), transitions between states, input/output processing per state, and execution history in the console. It orchestrates AWS services like Lambda, ECS, SQS, and SNS.
 
@@ -42,7 +42,7 @@ The mapping between Step Functions and LangGraph is direct. A Task state corresp
 
 The key difference: Step Functions orchestrates AWS services via API calls. LangGraph orchestrates AI agents in-process. Step Functions is language-agnostic (JSON definition); LangGraph is Python-native. Step Functions has built-in AWS console visualization; LangGraph has LangSmith for tracing.
 
-For production at Goldman, you might eventually wrap your LangGraph orchestrator in an ECS Fargate service and use Step Functions for the OUTER orchestration — triggering the underwriting pipeline from EventBridge events, handling retries at the infrastructure level, and integrating with other Camelot services. LangGraph handles the INNER orchestration of AI agents within a single service.
+For production at the company, you might eventually wrap your LangGraph orchestrator in an ECS Fargate service and use Step Functions for the OUTER orchestration — triggering the underwriting pipeline from EventBridge events, handling retries at the infrastructure level, and integrating with other Kuber services. LangGraph handles the INNER orchestration of AI agents within a single service.
 
 ---
 
@@ -114,7 +114,7 @@ When the agent recommends MANUAL_REVIEW, the graph needs to pause and wait for h
 
 When a node calls interrupt(), execution stops. The current state is saved via checkpointing. The graph returns the interrupt value (a message describing what human input is needed). Hours or days later, when the human provides a decision, you resume the graph by invoking it with the same thread_id. Execution continues from the interrupted node with the human's input.
 
-This is the equivalent of a Step Functions callback task. The workflow pauses, sends a notification (email, Slack, dashboard alert), and waits for an external signal to continue. In your underwriting system, the signal comes from a senior underwriter reviewing the case in the Camelot UI and entering their decision.
+This is the equivalent of a Step Functions callback task. The workflow pauses, sends a notification (email, Slack, dashboard alert), and waits for an external signal to continue. In your underwriting system, the signal comes from a senior underwriter reviewing the case in the Kuber UI and entering their decision.
 
 ---
 
@@ -192,7 +192,7 @@ LangGraph is the right choice for your underwriting system because you need all 
 
 **SqliteSaver** is file-based persistence. Survives process restarts but not machine failure. Single-machine only. Use for local development when you want persistence across restarts.
 
-**Redis** is actually the BEST fit for pipeline checkpointing. It is a pure key-value store designed for exactly this access pattern: write a blob by key, read a blob by key, set a TTL for automatic cleanup. Sub-millisecond reads and writes. With AOF persistence enabled, it also survives crashes. Since your Camelot architecture already includes Redis for caching, there is zero operational overhead to add checkpoint storage. Use for production pipeline checkpointing.
+**Redis** is actually the BEST fit for pipeline checkpointing. It is a pure key-value store designed for exactly this access pattern: write a blob by key, read a blob by key, set a TTL for automatic cleanup. Sub-millisecond reads and writes. With AOF persistence enabled, it also survives crashes. Since your Kuber architecture already includes Redis for caching, there is zero operational overhead to add checkpoint storage. Use for production pipeline checkpointing.
 
 **PostgreSQL** is a relational database used as a key-value store for checkpoints. The checkpoint table has thread_id (key) and serialized state (value). It works but you are using 1% of PostgreSQL's capabilities. The advantage is queryability — you can run SQL queries to find failed executions, analyze execution times, and build debugging dashboards. Use for when you need to query checkpoint data for analytics or debugging.
 
@@ -220,7 +220,7 @@ For persisting chat conversations (if you add a chat interface), the access patt
 
 DocumentDB/MongoDB is the natural fit — one document per conversation, messages as a nested array, single-document reads by conversation_id. DynamoDB also works well with conversation_id as partition key and timestamp as sort key. Relational databases like PostgreSQL work but feel unnatural — storing chat messages in a SQL table is using a relational engine for a document access pattern.
 
-For your system: DocumentDB for conversation persistence (if you add chat), same as where you store loan application records. This keeps everything in your existing Camelot data layer.
+For your system: DocumentDB for conversation persistence (if you add chat), same as where you store loan application records. This keeps everything in your existing Kuber data layer.
 
 ---
 
@@ -338,7 +338,7 @@ Parallel nodes do not share mutable state. Each receives a read-only snapshot, r
 | MemorySaver | Dev checkpointing (in-memory) | Local testing |
 | Redis checkpoint | Production checkpointing (fast key-value) | ElastiCache for session state |
 | PostgresSaver | Queryable checkpointing (analytics) | RDS for execution analytics |
-| DocumentDB | Conversation and result persistence | Camelot data layer |
+| DocumentDB | Conversation and result persistence | Kuber data layer |
 """
 
 with open("/tmp/week4_day1.md", "w") as f:

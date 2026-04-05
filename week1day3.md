@@ -9,7 +9,7 @@
 ## Topics Covered
 
 1. What is Bedrock architecturally (ECS for AI models)
-2. Authentication (IAM — same as Camelot)
+2. Authentication (IAM — same as Kuber)
 3. Two ways to call Bedrock (raw boto3 vs. LangChain)
 4. Temperature (deterministic vs. creative)
 5. System Prompts (agent configuration)
@@ -21,7 +21,7 @@
 ## 1. Bedrock = ECS for AI Models
 
 ```
-Camelot:  Java code → ECS Fargate → AWS manages containers
+Kuber:  Java code → ECS Fargate → AWS manages containers
 Bedrock:  Python code → Bedrock API → AWS manages GPU inference
 ```
 
@@ -35,7 +35,7 @@ No model hosting, no instance sizing, no CUDA drivers. Call an API, get a respon
 ## 2. Authentication
 
 ```
-Camelot:  ECS Task → IAM Task Role → DocumentDB, S3 permissions
+Kuber:  ECS Task → IAM Task Role → DocumentDB, S3 permissions
 Bedrock:  Your code → IAM User/Role → bedrock-runtime permission
 ```
 

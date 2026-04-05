@@ -43,7 +43,7 @@ Why circuit breakers matter: without one, credit bureau down means every evaluat
 
 Each external service gets its own circuit breaker: Bedrock, credit bureau, employment verification, Neo4j, OpenSearch. They fail independently.
 
-Java analogy: Resilience4j CircuitBreaker or Netflix Hystrix. Same pattern you use in Camelot.
+Java analogy: Resilience4j CircuitBreaker or Netflix Hystrix. Same pattern you use in Kuber.
 
 ### 2.3 Layer 3: Pipeline/Graph Level — Graceful Degradation
 
@@ -65,7 +65,7 @@ Example: Credit bureau has intermittent issues. First evaluation: call fails, La
 
 Numerical measurements tracked continuously. Evaluation count per hour. Success/failure rate. Average latency per node. Cost per evaluation. Circuit breaker state per service. Error count by category. Human review rate.
 
-These go to CloudWatch as custom metrics. Build dashboards showing trends. Set alarms for anomalies. Same CloudWatch infrastructure Goldman uses for Camelot.
+These go to CloudWatch as custom metrics. Build dashboards showing trends. Set alarms for anomalies. Same CloudWatch infrastructure the company uses for Kuber.
 
 ### 3.2 Logs — Structured Event Records
 
@@ -85,7 +85,7 @@ LangSmith in detail will be covered in Week 6 Day 1.
 
 Error rate exceeds 5% → page on-call engineer. Average latency exceeds 30 seconds → investigate bottleneck. Circuit breaker opens for any service → notify team. Cost per evaluation exceeds $0.05 → possible runaway LLM calls. Zero evaluations in last hour → system might be down.
 
-CloudWatch Alarms → SNS → PagerDuty/Slack. Same alerting infrastructure as Camelot.
+CloudWatch Alarms → SNS → PagerDuty/Slack. Same alerting infrastructure as Kuber.
 
 ---
 

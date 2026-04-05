@@ -96,7 +96,7 @@ bp('Checkpointing: ', 'LangGraph built-in. CrewAI none — restart from scratch.
 bp('Human-in-loop: ', 'LangGraph interrupt() persists across sessions. CrewAI blocks synchronously.')
 
 h2('Decision')
-p('LangGraph for production (Goldman underwriting). CrewAI for prototypes and demos. Same tools and LLMs — only orchestration differs. Migration requires rethinking data flow (string to typed).')
+p('LangGraph for production (the company underwriting). CrewAI for prototypes and demos. Same tools and LLMs — only orchestration differs. Migration requires rethinking data flow (string to typed).')
 
 # DAY 4
 h1('Day 4: Human-in-the-Loop & Checkpointing')
@@ -135,7 +135,7 @@ h2('Versioning')
 p('Version in thread_id. Keep old graph definitions until checkpoints expire via TTL. No migration needed.')
 
 h2('Deployment')
-p('One ECS Fargate service, NOT Lambda per node. Cold starts (2-15s), state transfer overhead, dependency duplication make Lambda-per-node impractical. Same pattern as Camelot services.')
+p('One ECS Fargate service, NOT Lambda per node. Cold starts (2-15s), state transfer overhead, dependency duplication make Lambda-per-node impractical. Same pattern as Kuber services.')
 
 # WEEKEND
 h1('Weekend BUILD: Complete Orchestrator')
@@ -187,7 +187,7 @@ tbl(
         ['Subgraph', 'Nested graph', 'Microservice internals'],
         ['Cycles', 'Iterative loops', 'Retry loops'],
         ['CrewAI', 'Team-based alternative', 'Spring Batch'],
-        ['Fargate service', 'Full pipeline in-process', 'Camelot pattern'],
+        ['Fargate service', 'Full pipeline in-process', 'Kuber pattern'],
         ['Compliance override', 'Legal veto', 'Regulatory authority'],
     ]
 )

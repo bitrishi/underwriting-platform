@@ -533,14 +533,14 @@
         <strong>FAISS / OpenSearch</strong> — Vector store. Semantic search over policy documents. RAG retrieval.<br><br>
         <strong>Redis</strong> — Caching. Session data, frequently accessed records.<br><br>
         <strong>PostgreSQL</strong> — Analytics. Complex aggregations via Glue ETL.<br><br>
-        <em>You already do this in Camelot (DocumentDB + Redis + PostgreSQL). Adding Neo4j for AI agents is the same pattern.</em>
+        <em>You already do this in Kuber (DocumentDB + Redis + PostgreSQL). Adding Neo4j for AI agents is the same pattern.</em>
       </div>
     </div>
     
     <div class="info-box red">
       <div class="info-title">DON'T Replace MongoDB with Graph DB</div>
       <div class="info-text">
-        MongoDB is perfect for Camelot's CRUD operations. Graph DB would make simple queries harder. Add Neo4j alongside as a secondary read-only store for AI agent use cases only. Sync selectively — only entities and relationships (~10% of data).
+        MongoDB is perfect for Kuber's CRUD operations. Graph DB would make simple queries harder. Add Neo4j alongside as a secondary read-only store for AI agent use cases only. Sync selectively — only entities and relationships (~10% of data).
       </div>
     </div>
   </div>

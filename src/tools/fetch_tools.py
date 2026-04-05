@@ -18,7 +18,7 @@ def pull_borrower_data(app_id: str) -> dict:
     Returns:
         Borrower profile with income, debt, loan, property data
     """
-    # SIMULATED — in production, calls Camelot API
+    # SIMULATED — in production, calls Kuber API
     applications = {
         "APP-001": {
             "name": "Alice Strong",

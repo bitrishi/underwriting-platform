@@ -89,7 +89,7 @@ html_content = """<!DOCTYPE html>
 <span class="white">PHASE 1: USER INITIATES EVALUATION</span>
 
   <span class="cyan">┌─────────────────────────────────────────────────────────────────────┐</span>
-  <span class="cyan">│  CAMELOT UI (Browser)                                               │</span>
+  <span class="cyan">│  KUBER UI (Browser)                                                 │</span>
   <span class="cyan">│                                                                     │</span>
   <span class="cyan">│  Underwriter clicks "Evaluate Loan"                                │</span>
   <span class="cyan">│  Enters: Application ID = APP-001                                  │</span>
@@ -186,7 +186,7 @@ html_content = """<!DOCTYPE html>
                               │
                               ▼
   <span class="cyan">┌─────────────────────────────────────────────────────────────────────┐</span>
-  <span class="cyan">│  CAMELOT UI                                                         │</span>
+  <span class="cyan">│  KUBER UI                                                           │</span>
   <span class="cyan">│                                                                     │</span>
   <span class="cyan">│  Shows: "Application APP-001 sent to senior review"                 │</span>
   <span class="cyan">│  Status badge: 🟠 PENDING REVIEW                                    │</span>
@@ -200,7 +200,7 @@ html_content = """<!DOCTYPE html>
 <span class="white">PHASE 3: HUMAN REVIEWS AND RESPONDS (hours/days later)</span>
 
   <span class="cyan">┌─────────────────────────────────────────────────────────────────────┐</span>
-  <span class="cyan">│  CAMELOT UI — Senior Underwriter Dashboard                          │</span>
+  <span class="cyan">│  KUBER UI — Senior Underwriter Dashboard                            │</span>
   <span class="cyan">│                                                                     │</span>
   <span class="cyan">│  Review Queue:                                                      │</span>
   <span class="cyan">│  ┌──────────────────────────────────────────────────────────┐        │</span>
@@ -275,7 +275,7 @@ html_content = """<!DOCTYPE html>
                               │
                               ▼
   <span class="cyan">┌─────────────────────────────────────────────────────────────────────┐</span>
-  <span class="cyan">│  CAMELOT UI                                                         │</span>
+  <span class="cyan">│  KUBER UI                                                           │</span>
   <span class="cyan">│                                                                     │</span>
   <span class="cyan">│  Status: ✅ APPROVED WITH CONDITIONS                                │</span>
   <span class="cyan">│  Shows complete report with automated + human decision               │</span>
@@ -290,7 +290,7 @@ html_content = """<!DOCTYPE html>
 <div class="grid3">
     <div class="box box-green">
         <h4>POST /api/evaluate</h4>
-        <p><strong>Who calls it:</strong> Camelot UI when underwriter clicks "Evaluate"</p>
+        <p><strong>Who calls it:</strong> Kuber UI when underwriter clicks "Evaluate"</p>
         <p><strong>Input:</strong></p>
         <pre>{ 
   "app_id": "APP-001",
@@ -562,8 +562,8 @@ async def submit_review(app_id: str, decision: ReviewDecision):
 </div>
 
 <div class="box box-gray">
-<h4>What Goldman/Camelot Already Does</h4>
-<p>This is the same problem you have with Camelot's amendment workflows. If a loan amendment is in-progress (partially completed by a user) and you deploy new code that changes the amendment flow, the in-progress amendment might break.</p>
+<h4>What the company/Kuber Already Does</h4>
+<p>This is the same problem you have with Kuber's amendment workflows. If a loan amendment is in-progress (partially completed by a user) and you deploy new code that changes the amendment flow, the in-progress amendment might break.</p>
 <p>Your existing solutions apply: blue-green deployment (old code handles old requests, new code handles new ones), database migrations with backward compatibility, feature flags to gradually enable new behavior.</p>
 <p>For LangGraph: add a <strong>"graph_version"</strong> field to your state. On resume, check if the checkpoint's graph_version matches the current version. If not, decide: complete with backward-compatible logic, or restart the evaluation.</p>
 </div>
@@ -768,7 +768,7 @@ Value (JSON):
 
 <div class="box box-blue">
 <h4>Q: What does the user enter initially?</h4>
-<p>The underwriter in Camelot UI enters the <strong>application ID</strong> (e.g., APP-001) and <strong>uploads documents</strong> (W-2, pay stubs). They click "Evaluate." That's it. The API creates the initial state and starts the graph. The user doesn't know about thread_ids, checkpoints, or LangGraph — they just see a status update: "Evaluating..." → "Pending Senior Review" → "Approved with Conditions."</p>
+<p>The underwriter in Kuber UI enters the <strong>application ID</strong> (e.g., APP-001) and <strong>uploads documents</strong> (W-2, pay stubs). They click "Evaluate." That's it. The API creates the initial state and starts the graph. The user doesn't know about thread_ids, checkpoints, or LangGraph — they just see a status update: "Evaluating..." → "Pending Senior Review" → "Approved with Conditions."</p>
 </div>
 
 <div class="box box-blue">

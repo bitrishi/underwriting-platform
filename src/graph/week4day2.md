@@ -164,7 +164,7 @@ An additional error path exists: if fetch_data fails fatally (borrower_package i
 
 ### Q: Why do I need 4 agents? Could one agent with all tools work?
 
-Yes, for simple cases with fewer than 10 tools. For your system with 17 tools across different capability domains (API calls, vision, calculations, legal reasoning) needing different models (Haiku vs Sonnet), one agent degrades in tool selection accuracy, requires a contradictory system prompt, and prevents optimal model selection. The split follows the same principles as your Camelot microservices decision.
+Yes, for simple cases with fewer than 10 tools. For your system with 17 tools across different capability domains (API calls, vision, calculations, legal reasoning) needing different models (Haiku vs Sonnet), one agent degrades in tool selection accuracy, requires a contradictory system prompt, and prevents optimal model selection. The split follows the same principles as your Kuber microservices decision.
 
 ### Q: When should I use one agent vs multiple?
 

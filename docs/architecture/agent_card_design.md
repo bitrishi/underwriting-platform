@@ -51,7 +51,7 @@ Access segmentation:
 
 ```json
 {
-  "name": "Goldman Underwriting Agent",
+  "name": "the company Underwriting Agent",
   "description": "Evaluates mortgage applications and returns risk, compliance, and decision outputs.",
   "url": "https://underwriting.goldman.internal/a2a",
   "version": "1.0.0",

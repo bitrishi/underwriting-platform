@@ -319,7 +319,7 @@ The checkpoint persists independently.
 
 <div class="step step-resume">
     <span class="step-number">STEP 6:</span>
-    <strong>Human reviews in Camelot UI</strong><br>
+    <strong>Human reviews in Kuber UI</strong><br>
     UI calls: GET /api/pending-reviews → shows all interrupted evaluations<br>
     Underwriter reads the risk assessment, compliance result, borrower data
 </div>
@@ -430,7 +430,7 @@ Audit Trail: [complete tool call history from all 4 agents]
 <div class="answer-box">
 <h4>Q: What if two processes try to resume the same thread_id?</h4>
 <p>The checkpoint store should use optimistic locking. When Process A loads the checkpoint to resume, it notes the checkpoint version. When it tries to write the next checkpoint, it checks the version hasn't changed. If Process B already resumed and advanced the checkpoint, Process A's write fails and it knows to abort.</p>
-<p>In practice, your API should ensure only one resume call per thread_id. The pending review queue in Camelot UI should show "APP-001: pending review" and once a reviewer claims it, others see "APP-001: under review by Jane Smith."</p>
+<p>In practice, your API should ensure only one resume call per thread_id. The pending review queue in Kuber UI should show "APP-001: pending review" and once a reviewer claims it, others see "APP-001: under review by Jane Smith."</p>
 </div>
 
 </div>

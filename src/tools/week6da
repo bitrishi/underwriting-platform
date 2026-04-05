@@ -1,0 +1,313 @@
+# Week 6, Day 4: FastAPI Deployment — Production API Layer for Kuber
+
+**Date:** April 5, 2026  
+**Module:** Deployment  
+**Platform:** Kuber Loan Origination System  
+
+---
+
+## 1. Session Overview
+
+**Topic:** FastAPI production deployment — wrapping the LangGraph orchestrator as a REST API with async submit/poll pattern, Pydantic schemas, health checks, SSE streaming, Dockerization, authentication, and ECS Fargate deployment architecture.
+
+**Prerequisites:** Week 6 Days 1–3 complete. LangGraph orchestrator with four agents built and evaluated. Phase 3 POC FastAPI basics covered.
+
+**Key Deliverable:** A production-ready FastAPI server exposing the underwriting pipeline as a REST API that Kuber's Java Loan Service and the Streamlit UI can consume.
+
+---
+
+## 2. Architecture Overview
+
+The LangGraph pipeline currently runs as a Python script. To make it usable by Kuber's existing services (Java Spring Boot Loan Service), the Streamlit UI (Day 5), and external consumers, a REST API layer is needed.
+
+Deployment model: single ECS Fargate service running FastAPI + LangGraph. Not Lambda-per-agent (cold starts, 15-min timeout). Not EKS (overkill). Fargate provides persistent containers, predictable latency, simple scaling, and Redis connectivity for checkpointing.
+
+---
+
+## 3. Key Design Decisions
+
+### 3.1 Asynchronous Submit/Poll Pattern
+
+A loan evaluation takes 10–15 seconds. Making the HTTP caller wait synchronously is a timeout risk. The pattern (like a Java `Future`):
+
+- **POST /evaluate** → Returns `job_id` immediately (~200ms). HTTP 202 Accepted.
+- **GET /evaluate/{job_id}/status** → Returns PENDING, RUNNING, COMPLETE, or FAILED.
+- **GET /evaluate/{job_id}/result** → Returns the full evaluation when COMPLETE.
+
+**Spring Boot analogy:** Like using `@Async` with `CompletableFuture` — the controller returns immediately, work happens in a background thread, caller retrieves the result later.
+
+### 3.2 Why Not LangServe
+
+LangServe is a LangChain utility that auto-generates a FastAPI server from your LangChain/LangGraph code. One line (`add_routes(app, graph, path="/evaluate")`) creates `/invoke`, `/stream`, `/batch`, and `/playground` endpoints automatically.
+
+**Java analogy:** Like Spring Data REST — define a JPA repository and Spring auto-generates the full CRUD REST API without writing controllers.
+
+Three reasons Kuber uses manual FastAPI instead:
+
+1. **Limited control** — cannot easily add the company's JWT authentication, custom error handling, audit logging, or the submit/poll async pattern
+2. **Opaque schemas** — auto-generated request/response schemas change when you modify the graph state. The Java Loan Service team needs a stable API contract
+3. **LangChain is moving away from it** — LangChain now recommends LangSmith Deployment (formerly LangGraph Platform) over standalone LangServe for production
+
+Bottom line: LangServe is great for demos (5 minutes to a working API). For the company production, manual FastAPI gives the control, security, and stability needed.
+
+### 3.3 Single ECS Fargate Service
+
+One container runs FastAPI + the full LangGraph pipeline. Gunicorn with 4 Uvicorn workers (2 × vCPUs + 1), 120-second timeout.
+
+---
+
+## 4. Production FastAPI Server
+
+### 4.1 Core Code Structure
+
+```python
+"""
+Kuber Underwriting API — FastAPI server wrapping LangGraph orchestrator.
+
+Spring Boot equivalents:
+  FastAPI()           → @SpringBootApplication
+  @app.post()         → @PostMapping
+  Pydantic BaseModel  → Java Record / DTO
+  BackgroundTasks     → @Async + CompletableFuture
+  Depends()           → @Autowired / Constructor Injection
+  HTTPException       → ResponseStatusException
+"""
+
+import uuid, asyncio
+from datetime import datetime
+from enum import Enum
+from fastapi import FastAPI, HTTPException, BackgroundTasks
+from pydantic import BaseModel, Field
+
+# ── Schemas (API Contract) ──────────────────────
+
+class EvaluationStatus(str, Enum):
+    PENDING = "PENDING"
+    RUNNING = "RUNNING"
+    COMPLETE = "COMPLETE"
+    FAILED = "FAILED"
+
+class EvaluationRequest(BaseModel):
+    application_id: str = Field(..., example="APP-001")
+    loan_type: str = Field(..., example="conventional")
+    jurisdiction: str = Field(..., example="TX")
+    borrower_data: dict
+    documents: list[str] = Field(default=[])
+    priority: str = Field(default="normal", pattern="^(high|normal|low)$")
+
+class EvaluationSubmitResponse(BaseModel):
+    job_id: str
+    status: EvaluationStatus
+    submitted_at: str
+    estimated_duration_seconds: int = 15
+
+# ── App Lifecycle ───────────────────────────────
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Like @PostConstruct / @PreDestroy in Spring."""
+    app.state.redis = redis.from_url("redis://kuber-redis:6379")
+    app.state.graph = build_underwriting_graph()
+    app.state.jobs = {}
+    yield
+    await app.state.redis.close()
+
+app = FastAPI(title="Kuber Underwriting API", lifespan=lifespan)
+
+# ── Background Execution ───────────────────────
+
+async def run_evaluation(job_id, request, app_state):
+    job = app_state.jobs[job_id]
+    job["status"] = EvaluationStatus.RUNNING
+    try:
+        result = await asyncio.to_thread(
+            app_state.graph.invoke,
+            {"application_id": request.application_id, ...},
+            config={"configurable": {"thread_id": job_id}}
+        )
+        job["status"] = EvaluationStatus.COMPLETE
+        job["result"] = result
+    except Exception as e:
+        job["status"] = EvaluationStatus.FAILED
+        job["error"] = str(e)
+
+# ── Endpoints ──────────────────────────────────
+
+@app.post("/evaluate", response_model=EvaluationSubmitResponse, status_code=202)
+async def submit_evaluation(request: EvaluationRequest, bg: BackgroundTasks):
+    """Submit evaluation. Returns immediately with job_id. HTTP 202."""
+    job_id = str(uuid.uuid4())
+    app.state.jobs[job_id] = {"status": EvaluationStatus.PENDING, ...}
+    bg.add_task(run_evaluation, job_id, request, app.state)
+    return EvaluationSubmitResponse(job_id=job_id, ...)
+
+@app.get("/evaluate/{job_id}/status")
+async def get_status(job_id: str):
+    if job_id not in app.state.jobs:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return app.state.jobs[job_id]
+
+@app.get("/evaluate/{job_id}/result")
+async def get_result(job_id: str):
+    job = app.state.jobs.get(job_id)
+    if not job: raise HTTPException(404, "Not found")
+    if job["status"] != EvaluationStatus.COMPLETE:
+        raise HTTPException(409, f"Not complete: {job['status']}")
+    return job["result"]
+
+@app.get("/health")
+async def health():
+    """ALB health check. Like /actuator/health in Spring Boot."""
+    redis_ok = await app.state.redis.ping()
+    return {"status": "healthy" if redis_ok else "degraded"}
+```
+
+### 4.2 SSE Streaming for Real-Time Progress
+
+```python
+from fastapi.responses import StreamingResponse
+
+@app.get("/evaluate/{job_id}/stream")
+async def stream_evaluation(job_id: str):
+    """Stream agent progress via Server-Sent Events."""
+    async def event_generator():
+        while True:
+            job = app.state.jobs.get(job_id)
+            if not job: break
+            yield f"data: {json.dumps({'status': job['status']})}\n\n"
+            if job["status"] in ("COMPLETE", "FAILED"): break
+            await asyncio.sleep(1)
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
+```
+
+### 4.3 Authentication
+
+```python
+from fastapi import Security, Depends
+from fastapi.security import HTTPBearer
+
+security = HTTPBearer()
+
+async def verify_goldman_token(creds = Security(security)):
+    """Like @PreAuthorize in Spring Security."""
+    payload = jwt.decode(creds.credentials, GOLDMAN_PUBLIC_KEY, ["RS256"])
+    return payload  # Injected as user into endpoints
+
+@app.post("/evaluate", status_code=202)
+async def submit(request: EvaluationRequest, user = Depends(verify_goldman_token)):
+    audit_log(user["sub"], "evaluation_submitted", request.application_id)
+    ...
+```
+
+---
+
+## 5. Spring Boot ↔ FastAPI Mapping
+
+| Spring Boot | FastAPI |
+|-------------|---------|
+| `@SpringBootApplication` | `FastAPI()` |
+| `@PostMapping("/evaluate")` | `@app.post("/evaluate")` |
+| `@GetMapping("/{id}/status")` | `@app.get("/{id}/status")` |
+| Java Record / DTO | Pydantic BaseModel |
+| `@Valid` + Bean Validation | Automatic (Pydantic validates) |
+| `@Autowired` / Constructor Injection | `Depends()` |
+| `ResponseStatusException` | `HTTPException` |
+| `@Async` + `CompletableFuture` | `BackgroundTasks` |
+| `@PostConstruct` / `@PreDestroy` | `lifespan` context manager |
+| `@PreAuthorize` / `SecurityFilterChain` | `Depends(verify_token)` |
+| `/actuator/health` | `@app.get("/health")` |
+| Embedded Tomcat | Gunicorn + Uvicorn workers |
+| SpringDoc / Swagger | Auto at `/docs` (built-in) |
+
+---
+
+## 6. Dockerization
+
+```dockerfile
+FROM python:3.12-slim
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+COPY kuber_api/ kuber_api/
+EXPOSE 8000
+CMD ["gunicorn", "kuber_api.main:app", \
+     "--workers", "4", \
+     "--worker-class", "uvicorn.workers.UvicornWorker", \
+     "--bind", "0.0.0.0:8000", \
+     "--timeout", "120"]
+```
+
+### Key Settings
+
+- **4 workers:** Formula is 2 × CPU cores + 1. On Fargate with 2 vCPUs, use 4.
+- **120-second timeout:** Default is 30s. Evaluations take 15s but can spike.
+- **UvicornWorker:** Gunicorn manages processes, Uvicorn handles async I/O within each.
+
+**Spring Boot analogy:** Gunicorn is like running multiple Tomcat instances behind a load balancer. Each Uvicorn worker is a thread pool within each instance.
+
+---
+
+## 7. ECS Fargate Deployment Architecture
+
+```
+ALB → ECS Fargate Service (2–8 tasks, auto-scaling on CPU)
+                ↓
+    ┌───────────┼───────────┐
+    ↓           ↓           ↓
+  Redis      Bedrock    OpenSearch
+  (ckpt)     (LLMs)     (RAG)
+```
+
+- **Auto-scaling:** Scale up above 60% CPU, down below 30%. Min 2, max 8 tasks.
+- **Capacity:** 2 tasks × 4 workers = 8 concurrent requests minimum.
+- **Health check:** ALB pings `/health` every 30 seconds. Non-200 → container replaced.
+
+---
+
+## 8. Questions & Answers
+
+### Q: What is LangServe?
+
+LangServe is a LangChain utility that auto-generates a FastAPI server from your LangChain/LangGraph code with one line. You call `add_routes(app, graph, path="/evaluate")` and it creates `/invoke`, `/stream`, `/batch`, and `/playground` endpoints automatically. Java analogy: like Spring Data REST — define a repository and Spring auto-generates the full CRUD API. We're not using it for Kuber because: (1) limited control over authentication, error handling, and async patterns, (2) auto-generated schemas create an unstable API contract for the Java team, and (3) LangChain now recommends LangSmith Deployment over standalone LangServe for production.
+
+### Q: Why HTTP 202 instead of 200?
+
+HTTP 202 Accepted means "I received your request but haven't processed it yet." This is the correct HTTP semantics for async operations. 200 would imply the evaluation is complete and the body contains the result. Using 202 makes the API contract clear: work is queued, not done.
+
+### Q: What happens if the container crashes during an evaluation?
+
+With BackgroundTasks (development): the evaluation is lost. For production: upgrade to Celery + SQS (task persists in queue, new worker picks it up) or AWS Step Functions (state managed by AWS). LangGraph's Redis checkpointing also helps — resume from last checkpoint on restart.
+
+### Q: How will the Java Loan Service call this API?
+
+Use Spring's WebClient (reactive) or RestTemplate: (1) POST /evaluate, receive 202 + job_id, (2) poll GET /status every 2–3 seconds, (3) when COMPLETE, GET /result. Alternative: implement webhook callback — FastAPI POSTs result back to Loan Service, eliminating polling.
+
+### Q: Why Gunicorn + Uvicorn instead of just Uvicorn?
+
+Uvicorn alone is single-process — handles async well but can't use multiple CPU cores. Gunicorn manages multiple worker processes, each running Uvicorn. This gives process-level isolation (one slow evaluation doesn't block others) plus async I/O within each process. Industry standard for production FastAPI.
+
+---
+
+## 9. Key Takeaways
+
+1. **Use async submit/poll (HTTP 202)** for long-running LLM evaluations. Never make the caller wait 15 seconds synchronously.
+
+2. **Manual FastAPI over LangServe** for the company production — LangServe lacks control for authentication, audit logging, and stable API contracts.
+
+3. **Pydantic schemas are your API contract** — auto-validated, auto-documented, type-safe. Like Java DTOs with built-in validation.
+
+4. **Gunicorn + Uvicorn workers** is the production standard. 2 × cores + 1 workers, 120-second timeout.
+
+5. **Health checks are critical** for ECS Fargate + ALB. Verify Redis and graph compilation.
+
+6. **For crash resilience**, upgrade from BackgroundTasks to Celery + SQS or Step Functions. Redis checkpointing enables resume after crashes.
+
+---
+
+## 10. Next Session Preview
+
+**Week 6, Day 5: Streamlit UI — Frontend for Agent Progress, Audit Trails & Human Review**
+
+Topics: Building the operator interface showing real-time agent execution, evaluation results visualization, human-in-the-loop review workflows, and connecting to the FastAPI service via SSE streaming.
+
+Connection: Today we built the API layer. Tomorrow we build the UI that consumes it — giving underwriters visibility into how the AI agents evaluated each loan application.

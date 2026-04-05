@@ -10,7 +10,7 @@ md_content = """# Week 4, Day 4: Human-in-the-Loop & Checkpointing
 
 ## 1. The Real-World Scenario
 
-Your Risk Scoring agent evaluates a loan and returns MANUAL_REVIEW — FICO 710, DTI 40%, cryptocurrency industry, borderline case. A senior underwriter at Goldman needs to review the full assessment, possibly pull additional information, and make the final call. This might happen 30 minutes later, or the next business day.
+Your Risk Scoring agent evaluates a loan and returns MANUAL_REVIEW — FICO 710, DTI 40%, cryptocurrency industry, borderline case. A senior underwriter at the company needs to review the full assessment, possibly pull additional information, and make the final call. This might happen 30 minutes later, or the next business day.
 
 The graph needs to STOP at the human_review node, SAVE everything computed so far (borrower data, document review, risk assessment, compliance check), and RESUME exactly where it left off when the human responds.
 
@@ -32,11 +32,11 @@ In mortgage underwriting, roughly 20-30% of applications require some form of ma
 
 **Step 5:** The graph invocation RETURNS to your application code. It returns the interrupt value (the review message), NOT a final result. The graph is not done — it is paused.
 
-**Step 6:** Your application code sends the interrupt message to the human through whatever channel your system uses — Camelot UI notification, email, Slack message. This is YOUR code, not LangGraph.
+**Step 6:** Your application code sends the interrupt message to the human through whatever channel your system uses — Kuber UI notification, email, Slack message. This is YOUR code, not LangGraph.
 
 **Step 7:** Time passes. Hours or days. The graph is not running. No process is waiting. No thread is sleeping. The state sits in Redis. Your application servers can restart, deploy new code, scale up or down. The checkpoint persists independently of any running process.
 
-**Step 8:** The human provides a decision through the Camelot UI. Your API receives: "APPROVED with conditions — require 6 months cash reserves."
+**Step 8:** The human provides a decision through the Kuber UI. Your API receives: "APPROVED with conditions — require 6 months cash reserves."
 
 **Step 9:** Your API resumes the graph using the same thread_id and the human's input. LangGraph loads the checkpoint from Redis, reconstructs the full state, injects the human's response as the return value of interrupt(), and execution continues from human_review_node.
 
@@ -94,7 +94,7 @@ LangGraph does NOT "understand" that this is a human response. It simply sees: "
 
 ### 4.3 What If Two Processes Try to Resume the Same thread_id?
 
-The checkpoint store should use optimistic locking or your API should enforce single-resume semantics. In practice, the pending review queue in the Camelot UI should show "APP-001: pending review" and once a reviewer claims it, others see "APP-001: under review by Jane Smith." This is standard workflow management — the same pattern you use for any task assignment system.
+The checkpoint store should use optimistic locking or your API should enforce single-resume semantics. In practice, the pending review queue in the Kuber UI should show "APP-001: pending review" and once a reviewer claims it, others see "APP-001: under review by Jane Smith." This is standard workflow management — the same pattern you use for any task assignment system.
 
 ---
 
@@ -104,7 +104,7 @@ The checkpoint store should use optimistic locking or your API should enforce si
 
 **Endpoint 1: Start Evaluation.** Receives a loan evaluation request, starts the graph. Returns immediately with either a final result (graph completed without interrupt) or a "pending review" status (graph interrupted).
 
-**Endpoint 2: Get Pending Reviews.** The Camelot UI queries for all interrupted pipeline executions. This queries the checkpoint store for executions with status "interrupted." Returns a list of loans awaiting human review with their risk summaries.
+**Endpoint 2: Get Pending Reviews.** The Kuber UI queries for all interrupted pipeline executions. This queries the checkpoint store for executions with status "interrupted." Returns a list of loans awaiting human review with their risk summaries.
 
 **Endpoint 3: Submit Review Decision.** The human submits their decision. The API resumes the graph with the human's input and returns the final result.
 

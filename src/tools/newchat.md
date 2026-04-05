@@ -247,7 +247,7 @@ Cons: Can't handle edge cases or nuances. Purely mechanical.
 
 ### 5.2 Audit Trail Requirements
 
-For Goldman-level production, every risk assessment must include:
+For the company-level production, every risk assessment must include:
 - **What data was used:** Specific values for every criterion
 - **Where data came from:** Which tools were called, what they returned
 - **What rules were applied:** Policy citations from RAG

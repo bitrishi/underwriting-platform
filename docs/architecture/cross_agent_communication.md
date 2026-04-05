@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Define what stays internal to the current underwriting orchestrator (LangGraph shared state) and what should become external agent-to-agent interactions (A2A) if Goldman runs multiple independent agent systems.
+Define what stays internal to the current underwriting orchestrator (LangGraph shared state) and what should become external agent-to-agent interactions (A2A) if the company runs multiple independent agent systems.
 
 ## 1. Internal vs External Boundaries
 
@@ -22,7 +22,7 @@ Reasons to keep internal:
 - Low-latency fan-out/fan-in orchestration
 - Easier deterministic replay and audit in one graph execution
 
-### External interactions (future multi-system Goldman architecture)
+### External interactions (future multi-system the company architecture)
 
 These are better represented as A2A when systems are independently owned/deployed:
 
@@ -38,7 +38,7 @@ Reasons to use A2A:
 - Long-running delegated tasks with asynchronous status
 - Opaque execution requirements between systems
 
-## 2. Mortgage Party Mapping (Goldman Workflow)
+## 2. Mortgage Party Mapping (the company Workflow)
 
 | Party | Typical Interaction | Internal (LangGraph state) or External (A2A) | Why |
 |---|---|---|---|

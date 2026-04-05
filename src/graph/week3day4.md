@@ -511,7 +511,7 @@ Don't replace MongoDB. Add Neo4j alongside as a secondary, read-only store for A
 
 | Store | Purpose | Used By |
 |-------|---------|---------|
-| MongoDB (DocumentDB) | Primary CRUD, UI, reports | Camelot app |
+| MongoDB (DocumentDB) | Primary CRUD, UI, reports | Kuber app |
 | Neo4j | Relationship traversal, risk context | AI agents only |
 | FAISS / OpenSearch | Semantic search, RAG | AI agents only |
 | Redis | Caching | Both |
@@ -527,12 +527,12 @@ You already do this pattern (DocumentDB → Redis → PostgreSQL). Adding Neo4j 
 Same results possible with JOINs. Difference: 1-2 JOINs → MySQL fine. 5+ JOINs → MySQL painful (index scans multiply). Graph stays fast (pointer follows are O(1) per hop regardless of DB size).
 
 ### Q: Why have I never used graph DB?
-Most apps need 1-2 level relationships. Camelot CRUD (loan → borrowers → payments) is perfect for MongoDB. Graph only shines at 5+ hop traversals.
+Most apps need 1-2 level relationships. Kuber CRUD (loan → borrowers → payments) is perfect for MongoDB. Graph only shines at 5+ hop traversals.
 
 ### Q: Why famous now?
 AI agents ask unpredictable multi-hop questions at runtime. RAG misses relationship context. LLMs generate Cypher better than complex SQL.
 
-### Q: Replace MongoDB with graph for Camelot?
+### Q: Replace MongoDB with graph for Kuber?
 No. MongoDB is perfect for CRUD/UI. Add Neo4j alongside for AI agents only. Polyglot persistence.
 
 ### Q: Neo4j vs Neptune?

@@ -195,7 +195,7 @@ The production recommendation is a hybrid. Use deterministic scoring for the num
 
 ### 5.2 Audit Trail Requirements
 
-For Goldman-level production, every risk assessment must include: what data was used (specific values for every criterion), where data came from (which tools were called, what they returned), what rules were applied (policy citations from RAG), what context was considered (industry data from knowledge graph), what the decision was (score, level, recommendation), why the decision was made (step-by-step reasoning), and what was NOT available (missing data, failed tool calls).
+For the company-level production, every risk assessment must include: what data was used (specific values for every criterion), where data came from (which tools were called, what they returned), what rules were applied (policy citations from RAG), what context was considered (industry data from knowledge graph), what the decision was (score, level, recommendation), why the decision was made (step-by-step reasoning), and what was NOT available (missing data, failed tool calls).
 
 The RiskAssessment Pydantic model captures all of this. The format_report() method produces a human-readable version. The callback tracer from Week 2 captures the tool call history. Together, these provide a complete audit trail that satisfies regulatory requirements.
 

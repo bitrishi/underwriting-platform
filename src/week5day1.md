@@ -95,7 +95,7 @@ You can also filter which tools to pull from a server, preventing tool count exp
 
 Authentication happens between YOUR CODE (MCP client) and the MCP server. The LLM never sees credentials. Identical to how your current @tool functions handle auth internally.
 
-MCP supports OAuth 2.0, API keys, and mutual TLS. For Goldman internal servers, use existing PingFederate tokens. For external servers, auth configured on the client connection.
+MCP supports OAuth 2.0, API keys, and mutual TLS. For the company internal servers, use existing PingFederate tokens. For external servers, auth configured on the client connection.
 
 Authorization controlled by the server — your agent can pull reports but not modify records. Data isolation per connection. Audit on both sides — every tool call logged with identity, parameters, timestamp, response.
 
@@ -133,7 +133,7 @@ Standard schema format — you already solve this with @tool. LangChain standard
 
 Vendor switching — you can do the same today by changing @tool internals and redeploying. MCP moves the change to the server. Same total work when you own both sides.
 
-Multi-team sharing — real advantage at organizational scale. If 20 Goldman teams need Camelot data, one MCP server is better than 20 custom wrappers. But Goldman already has microservices for this — each team calls the same REST API and writes a thin @tool wrapper (5-10 lines). MCP eliminates those thin wrappers.
+Multi-team sharing — real advantage at organizational scale. If 20 the company teams need Kuber data, one MCP server is better than 20 custom wrappers. But the company already has microservices for this — each team calls the same REST API and writes a thin @tool wrapper (5-10 lines). MCP eliminates those thin wrappers.
 
 Third-party marketplace — potentially significant in 2-3 years when credit bureaus and GSEs publish MCP servers. Zero value today since none exist.
 
@@ -141,13 +141,13 @@ Third-party marketplace — potentially significant in 2-3 years when credit bur
 
 For YOUR current underwriting system: MCP provides almost no practical advantage over @tool wrappers. You control your tools, have 4 focused agents, tools are stable.
 
-For Goldman's AI PLATFORM in a year: if 10+ teams build agents needing the same data sources, MCP becomes the standard interface preventing redundant integration work.
+For the company's AI PLATFORM in a year: if 10+ teams build agents needing the same data sources, MCP becomes the standard interface preventing redundant integration work.
 
 For the mortgage industry in 2-3 years: when providers publish MCP servers, connecting to a credit bureau becomes config instead of a multi-day integration.
 
 ### 8.3 Recommendation
 
-Understand MCP (you now do). Build with @tool today. Document when Goldman should adopt MCP and the migration path. Do not implement MCP for your underwriting system — it adds complexity without current benefit.
+Understand MCP (you now do). Build with @tool today. Document when the company should adopt MCP and the migration path. Do not implement MCP for your underwriting system — it adds complexity without current benefit.
 
 ---
 
@@ -155,7 +155,7 @@ Understand MCP (you now do). Build with @tool today. Document when Goldman shoul
 
 ### 9.1 It IS Like a Microservice
 
-MCP server is essentially a microservice with a standardized contract. Your Camelot architecture already does this — Angular UI calls Core Service REST API. Switch DocumentDB to PostgreSQL, UI unchanged because the API contract stays the same.
+MCP server is essentially a microservice with a standardized contract. Your Kuber architecture already does this — Angular UI calls Core Service REST API. Switch DocumentDB to PostgreSQL, UI unchanged because the API contract stays the same.
 
 MCP is the same for AI tools. Agent calls MCP server. Switch Equifax to TransUnion internally. Agent unchanged because the MCP contract stays the same.
 
@@ -171,7 +171,7 @@ Runtime capability discovery (agent asks "what tools do you have?" — like refl
 
 ## 10. Q&A
 
-### Q: Today I write @tool wrappers for Goldman's existing microservices. If they exposed MCP instead, what is the gain?
+### Q: Today I write @tool wrappers for the company's existing microservices. If they exposed MCP instead, what is the gain?
 
 Except for automatic tool discovery, the gain is minimal when you are the only consumer. The real value emerges when multiple teams consume the same tools — MCP eliminates per-team wrapper code. For your single underwriting system, @tool is correct.
 
@@ -199,7 +199,7 @@ Similar but adds: runtime capability discovery (tools/list), standardized tool s
 
 No. MCP is connectivity, not decision-making. It connects you to vendors but does not choose between them. Vendor routing logic is YOUR code. MCP just ensures the connection format is standard across all vendors.
 
-### Q: Goldman has microservices with APIs. I write @tool wrappers. If they expose MCP instead, what changes?
+### Q: the company has microservices with APIs. I write @tool wrappers. If they expose MCP instead, what changes?
 
 You eliminate the thin @tool wrapper (5-10 lines per tool). The MCP client auto-discovers tools from the server. The gain is real but small for a single consuming team. It becomes significant when 20 teams consume the same services.
 

@@ -132,7 +132,7 @@ AutoGen is better for code review (agents critique each other's code), research 
 
 ### 6.1 When to Choose LangGraph
 
-Choose LangGraph when you need precise control over execution flow, true parallel execution of independent tasks, typed state management with Pydantic validation, checkpointing and crash recovery, human-in-the-loop that persists across sessions, conditional routing based on state, production reliability with predictable costs, or when Goldman production underwriting is the target.
+Choose LangGraph when you need precise control over execution flow, true parallel execution of independent tasks, typed state management with Pydantic validation, checkpointing and crash recovery, human-in-the-loop that persists across sessions, conditional routing based on state, production reliability with predictable costs, or when the company production underwriting is the target.
 
 ### 6.2 When to Choose CrewAI
 
@@ -162,7 +162,7 @@ Essentially yes. Role + goal + backstory are concatenated into a system prompt. 
 
 CrewAI has output_pydantic on Tasks, but the handoff between tasks is still text-based. Task A's output is passed as a string in Task B's context. LangGraph's state is typed throughout — no serialization/deserialization between nodes.
 
-### Q: Which for Camelot's natural language query service?
+### Q: Which for Kuber's natural language query service?
 
 For a simpler flow (parse query, generate SQL, execute, format response), CrewAI might work fine. For the underwriting system with parallel agents, compliance checks, conditional routing, and human-in-the-loop — LangGraph.
 

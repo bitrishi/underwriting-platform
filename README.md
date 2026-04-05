@@ -25,6 +25,9 @@ python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env  # add your AWS credentials
+
+# Keep LangSmith API key in terminal/session only
+export LANGCHAIN_API_KEY=your_langsmith_api_key
 ```
 
 ## Project Structure

@@ -13,6 +13,7 @@ import json
 import sys
 from pathlib import Path
 from time import perf_counter
+from types import SimpleNamespace
 from typing import Any
 from unittest.mock import patch
 
