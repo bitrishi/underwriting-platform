@@ -1,0 +1,12 @@
+INFO:     Started server process [28786]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+INFO:     127.0.0.1:64947 - "GET /health HTTP/1.1" 200 OK
+2026-04-05 18:59:54,656 | botocore.credentials | INFO | Found credentials in shared credentials file: ~/.aws/credentials
+2026-04-05 18:59:55,086 | src.chains.underwriter_chain | INFO | UnderwriterChain initialized
+2026-04-05 18:59:55,343 | src.api.history_store | WARNING | Redis unavailable, falling back to in-memory history: Error 61 connecting to localhost:6379. Connection refused.
+INFO:     127.0.0.1:64971 - "POST /evaluate HTTP/1.1" 202 Accepted
+INFO:     127.0.0.1:64974 - "GET /status?job_id=ff91aa16-2ae1-4ab3-ac1e-b27cee4f931b HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64975 - "GET /result?job_id=ff91aa16-2ae1-4ab3-ac1e-b27cee4f931b HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64976 - "GET /result?job_id=ff91aa16-2ae1-4ab3-ac1e-b27cee4f931b HTTP/1.1" 200 OK
