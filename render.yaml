@@ -1,0 +1,37 @@
+services:
+  - type: pserv
+    name: underwriting-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile.api
+    autoDeploy: true
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHONPATH
+        value: /app
+      - key: AWS_EC2_METADATA_DISABLED
+        value: "true"
+      - key: UNDERWRITING_DEMO_MODE
+        value: "true"
+      - key: SIMULATED_AGENT_DELAY_S
+        value: "0.05"
+      - key: REDIS_URL
+        fromService:
+          name: underwriting-redis
+          type: redis
+          property: connectionString
+
+  - type: web
+    name: underwriting-dashboard
+    runtime: docker
+    dockerfilePath: ./Dockerfile.dashboard
+    autoDeploy: true
+    envVars:
+      - key: PYTHONPATH
+        value: /app
+      - key: UNDERWRITING_API_URL
+        value: http://underwriting-api:8000
+
+  - type: redis
+    name: underwriting-redis
+    ipAllowList: []
+    maxmemoryPolicy: noeviction

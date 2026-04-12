@@ -1,0 +1,1148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The GenAI Reference — Kuber Edition</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500;9..144,600;9..144,800&family=JetBrains+Mono:wght@400;500;600&family=Inter+Tight:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #1a1612;
+    --ink-soft: #4a4239;
+    --ink-faint: #8a8276;
+    --paper: #f7f3ec;
+    --paper-warm: #efe8db;
+    --paper-deep: #e8dfcd;
+    --accent: #b8421a;
+    --accent-soft: #d4683f;
+    --gold: #b08840;
+    --green: #4a6b3a;
+    --rule: rgba(26, 22, 18, 0.12);
+    --rule-strong: rgba(26, 22, 18, 0.25);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  
+  html { scroll-behavior: smooth; }
+  
+  body {
+    font-family: 'Fraunces', Georgia, serif;
+    font-weight: 400;
+    background: var(--paper);
+    color: var(--ink);
+    line-height: 1.65;
+    font-size: 17px;
+    -webkit-font-smoothing: antialiased;
+    background-image: 
+      radial-gradient(at 20% 0%, rgba(176, 136, 64, 0.06) 0%, transparent 50%),
+      radial-gradient(at 80% 100%, rgba(184, 66, 26, 0.04) 0%, transparent 50%);
+    background-attachment: fixed;
+  }
+
+  /* ── LAYOUT ── */
+  .container {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 0 40px;
+    display: grid;
+    grid-template-columns: 240px 1fr;
+    gap: 60px;
+  }
+
+  /* ── SIDEBAR NAV ── */
+  .sidebar {
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    padding: 60px 0 40px 0;
+    overflow-y: auto;
+    border-right: 1px solid var(--rule);
+    padding-right: 30px;
+  }
+
+  .sidebar-brand {
+    font-family: 'Fraunces', serif;
+    font-weight: 800;
+    font-size: 14px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 4px;
+  }
+
+  .sidebar-sub {
+    font-family: 'Inter Tight', sans-serif;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin-bottom: 32px;
+  }
+
+  .sidebar-nav {
+    list-style: none;
+  }
+
+  .sidebar-nav li {
+    margin-bottom: 4px;
+  }
+
+  .sidebar-nav a {
+    display: block;
+    font-family: 'Inter Tight', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--ink-soft);
+    text-decoration: none;
+    padding: 8px 0 8px 14px;
+    border-left: 2px solid transparent;
+    transition: all 0.2s ease;
+  }
+
+  .sidebar-nav a:hover {
+    color: var(--accent);
+    border-left-color: var(--accent-soft);
+  }
+
+  .sidebar-nav .nav-num {
+    color: var(--ink-faint);
+    font-variant-numeric: tabular-nums;
+    margin-right: 10px;
+    font-weight: 400;
+  }
+
+  .sidebar-footer {
+    margin-top: 40px;
+    padding-top: 24px;
+    border-top: 1px solid var(--rule);
+    font-family: 'Inter Tight', sans-serif;
+    font-size: 11px;
+    color: var(--ink-faint);
+    line-height: 1.5;
+  }
+
+  /* ── MAIN CONTENT ── */
+  .content {
+    padding: 60px 0 120px 0;
+    max-width: 760px;
+  }
+
+  /* ── MASTHEAD ── */
+  .masthead {
+    border-top: 4px double var(--ink);
+    border-bottom: 1px solid var(--rule);
+    padding: 32px 0 28px 0;
+    margin-bottom: 60px;
+  }
+
+  .masthead-meta {
+    display: flex;
+    justify-content: space-between;
+    font-family: 'Inter Tight', sans-serif;
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin-bottom: 24px;
+  }
+
+  .masthead-title {
+    font-family: 'Fraunces', serif;
+    font-weight: 800;
+    font-size: 64px;
+    line-height: 0.95;
+    letter-spacing: -0.025em;
+    margin-bottom: 16px;
+    font-variation-settings: 'opsz' 144;
+  }
+
+  .masthead-title em {
+    font-style: italic;
+    font-weight: 300;
+    color: var(--accent);
+  }
+
+  .masthead-deck {
+    font-family: 'Fraunces', serif;
+    font-size: 21px;
+    line-height: 1.4;
+    color: var(--ink-soft);
+    font-style: italic;
+    font-weight: 300;
+    max-width: 600px;
+  }
+
+  .masthead-byline {
+    margin-top: 28px;
+    font-family: 'Inter Tight', sans-serif;
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+  }
+
+  /* ── SECTIONS ── */
+  section {
+    margin-bottom: 80px;
+    scroll-margin-top: 40px;
+  }
+
+  .section-num {
+    display: inline-block;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--accent);
+    letter-spacing: 0.1em;
+    margin-bottom: 8px;
+    padding: 4px 10px;
+    border: 1px solid var(--accent);
+    border-radius: 2px;
+  }
+
+  h1 {
+    font-family: 'Fraunces', serif;
+    font-weight: 700;
+    font-size: 42px;
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+    margin-bottom: 12px;
+    margin-top: 0;
+    font-variation-settings: 'opsz' 144;
+  }
+
+  .section-tagline {
+    font-family: 'Fraunces', serif;
+    font-style: italic;
+    font-size: 18px;
+    color: var(--ink-soft);
+    font-weight: 300;
+    margin-bottom: 32px;
+    padding-bottom: 24px;
+    border-bottom: 1px solid var(--rule);
+  }
+
+  h2 {
+    font-family: 'Fraunces', serif;
+    font-weight: 600;
+    font-size: 26px;
+    line-height: 1.2;
+    margin-top: 48px;
+    margin-bottom: 16px;
+    color: var(--ink);
+    letter-spacing: -0.01em;
+  }
+
+  h3 {
+    font-family: 'Inter Tight', sans-serif;
+    font-weight: 600;
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-top: 32px;
+    margin-bottom: 12px;
+    color: var(--accent);
+  }
+
+  p {
+    margin-bottom: 18px;
+  }
+
+  p + p { text-indent: 1.5em; }
+  h2 + p, h3 + p, blockquote + p, pre + p, .callout + p, ul + p, ol + p, table + p { text-indent: 0; }
+
+  strong { font-weight: 600; color: var(--ink); }
+  em { font-style: italic; }
+
+  a { color: var(--accent); text-decoration: none; border-bottom: 1px solid var(--accent-soft); }
+  a:hover { background: rgba(184, 66, 26, 0.08); }
+
+  /* ── PULL QUOTE / CALLOUT ── */
+  blockquote {
+    font-family: 'Fraunces', serif;
+    font-style: italic;
+    font-size: 24px;
+    line-height: 1.4;
+    color: var(--ink);
+    border-left: 3px solid var(--accent);
+    padding: 8px 0 8px 28px;
+    margin: 32px 0;
+    font-weight: 300;
+  }
+
+  blockquote::before {
+    content: "❝";
+    color: var(--accent);
+    font-size: 32px;
+    margin-right: 4px;
+    line-height: 0;
+    vertical-align: -8px;
+  }
+
+  .callout {
+    background: var(--paper-warm);
+    border: 1px solid var(--rule);
+    border-left: 4px solid var(--accent);
+    padding: 20px 24px;
+    margin: 24px 0;
+    font-size: 15px;
+    line-height: 1.6;
+  }
+
+  .callout-title {
+    font-family: 'Inter Tight', sans-serif;
+    font-weight: 600;
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 8px;
+  }
+
+  /* ── LISTS ── */
+  ul, ol {
+    margin: 16px 0 24px 0;
+    padding-left: 28px;
+  }
+
+  ul li, ol li {
+    margin-bottom: 8px;
+    line-height: 1.6;
+  }
+
+  ul { list-style: none; padding-left: 0; }
+  ul li {
+    position: relative;
+    padding-left: 24px;
+  }
+  ul li::before {
+    content: "—";
+    position: absolute;
+    left: 0;
+    color: var(--accent);
+    font-weight: 600;
+  }
+
+  ol { padding-left: 28px; }
+  ol li::marker {
+    color: var(--accent);
+    font-weight: 600;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  /* ── CODE ── */
+  code {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    background: var(--paper-deep);
+    padding: 2px 6px;
+    border-radius: 2px;
+    color: var(--accent);
+    border: 1px solid var(--rule);
+  }
+
+  pre {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    line-height: 1.6;
+    background: var(--ink);
+    color: #f4ede0;
+    padding: 24px 28px;
+    border-radius: 4px;
+    overflow-x: auto;
+    margin: 24px 0;
+    border-left: 4px solid var(--accent);
+  }
+
+  pre code {
+    background: transparent;
+    color: inherit;
+    padding: 0;
+    border: none;
+  }
+
+  /* ── TABLES ── */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 28px 0;
+    font-size: 14px;
+    font-family: 'Inter Tight', sans-serif;
+  }
+
+  th {
+    text-align: left;
+    font-family: 'Inter Tight', sans-serif;
+    font-weight: 600;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink);
+    padding: 12px 16px;
+    border-bottom: 2px solid var(--ink);
+    background: var(--paper-warm);
+  }
+
+  td {
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--rule);
+    vertical-align: top;
+    line-height: 1.5;
+    color: var(--ink-soft);
+  }
+
+  tr:hover td { background: var(--paper-warm); }
+
+  td strong { color: var(--ink); }
+
+  /* ── DECISION TREE / DIAGRAMS ── */
+  .diagram {
+    background: var(--paper-warm);
+    border: 1px solid var(--rule);
+    padding: 24px 28px;
+    margin: 28px 0;
+    border-radius: 2px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    line-height: 1.7;
+    color: var(--ink);
+    overflow-x: auto;
+    white-space: pre;
+  }
+
+  /* ── STRATEGY CARDS ── */
+  .strategy-grid {
+    display: grid;
+    gap: 16px;
+    margin: 28px 0;
+  }
+
+  .strategy-card {
+    border: 1px solid var(--rule);
+    background: var(--paper);
+    padding: 22px 26px;
+    border-radius: 2px;
+    transition: all 0.2s ease;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .strategy-card::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+    background: var(--accent);
+  }
+
+  .strategy-card.primary::before { background: var(--green); }
+  .strategy-card.expensive::before { background: var(--gold); }
+
+  .strategy-card:hover {
+    transform: translateX(4px);
+    box-shadow: -4px 4px 0 var(--paper-deep);
+  }
+
+  .strategy-num {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--ink-faint);
+    letter-spacing: 0.1em;
+    margin-bottom: 4px;
+  }
+
+  .strategy-title {
+    font-family: 'Fraunces', serif;
+    font-weight: 600;
+    font-size: 19px;
+    color: var(--ink);
+    margin-bottom: 8px;
+  }
+
+  .strategy-meta {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 10px;
+    font-family: 'Inter Tight', sans-serif;
+    font-size: 11px;
+    color: var(--ink-faint);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  .strategy-meta span {
+    padding: 2px 8px;
+    background: var(--paper-warm);
+    border-radius: 2px;
+  }
+
+  .strategy-desc {
+    font-family: 'Fraunces', serif;
+    font-size: 14px;
+    color: var(--ink-soft);
+    line-height: 1.55;
+  }
+
+  .badge {
+    display: inline-block;
+    font-family: 'Inter Tight', sans-serif;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    border-radius: 2px;
+    margin-left: 8px;
+  }
+
+  .badge.primary { background: var(--green); color: var(--paper); }
+  .badge.expensive { background: var(--gold); color: var(--paper); }
+
+  /* ── COMPARISON BLOCKS ── */
+  .vs-block {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: 20px;
+    align-items: stretch;
+    margin: 28px 0;
+  }
+
+  .vs-side {
+    background: var(--paper-warm);
+    border: 1px solid var(--rule);
+    padding: 20px 24px;
+    border-radius: 2px;
+  }
+
+  .vs-side h4 {
+    font-family: 'Inter Tight', sans-serif;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--accent);
+    margin-bottom: 12px;
+    font-weight: 600;
+  }
+
+  .vs-side p {
+    font-family: 'Fraunces', serif;
+    font-size: 14px;
+    color: var(--ink-soft);
+    margin: 0;
+    line-height: 1.55;
+  }
+
+  .vs-divider {
+    display: flex;
+    align-items: center;
+    font-family: 'Fraunces', serif;
+    font-style: italic;
+    font-size: 14px;
+    color: var(--ink-faint);
+  }
+
+  /* ── DROP CAP ── */
+  .drop-cap::first-letter {
+    font-family: 'Fraunces', serif;
+    font-weight: 800;
+    font-size: 76px;
+    line-height: 0.85;
+    float: left;
+    padding: 6px 8px 0 0;
+    color: var(--accent);
+    font-variation-settings: 'opsz' 144;
+  }
+
+  /* ── DIVIDER ── */
+  .ornament {
+    text-align: center;
+    margin: 60px 0;
+    color: var(--ink-faint);
+    font-size: 18px;
+    letter-spacing: 0.5em;
+  }
+
+  /* ── HORIZONTAL RULE BREAK ── */
+  hr.section-break {
+    border: none;
+    border-top: 1px solid var(--rule);
+    margin: 48px 0;
+  }
+
+  /* ── COLOPHON ── */
+  .colophon {
+    margin-top: 100px;
+    padding-top: 40px;
+    border-top: 4px double var(--ink);
+    font-family: 'Inter Tight', sans-serif;
+    font-size: 12px;
+    color: var(--ink-faint);
+    text-align: center;
+    letter-spacing: 0.05em;
+  }
+
+  .colophon-mark {
+    font-family: 'Fraunces', serif;
+    font-style: italic;
+    font-size: 14px;
+    color: var(--accent);
+    margin-bottom: 12px;
+  }
+
+  /* ── RESPONSIVE ── */
+  @media (max-width: 1024px) {
+    .container { grid-template-columns: 1fr; padding: 0 24px; gap: 0; }
+    .sidebar { position: relative; height: auto; padding: 24px 0; border-right: none; border-bottom: 1px solid var(--rule); padding-right: 0; }
+    .content { padding: 40px 0 80px 0; max-width: 100%; }
+    .masthead-title { font-size: 42px; }
+    .vs-block { grid-template-columns: 1fr; }
+    .vs-divider { justify-content: center; }
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+
+  <!-- ──────────────── SIDEBAR ──────────────── -->
+  <aside class="sidebar">
+    <div class="sidebar-brand">Kuber Edition</div>
+    <div class="sidebar-sub">Reference · April 2026</div>
+    <ul class="sidebar-nav">
+      <li><a href="#what-is-agent"><span class="nav-num">01</span>Anatomy of an Agent</a></li>
+      <li><a href="#rag"><span class="nav-num">02</span>RAG, All Eight Strategies</a></li>
+      <li><a href="#memory"><span class="nav-num">03</span>Memory & Context</a></li>
+      <li><a href="#evals"><span class="nav-num">04</span>Evaluating Agents</a></li>
+      <li><a href="#bedrock"><span class="nav-num">05</span>Bedrock Tooling</a></li>
+      <li><a href="#decisions"><span class="nav-num">06</span>Decisions for Kuber</a></li>
+    </ul>
+    <div class="sidebar-footer">
+      A field reference compiled from six weeks of construction. Read it cover to cover, or pull a section when you need it.
+    </div>
+  </aside>
+
+  <!-- ──────────────── CONTENT ──────────────── -->
+  <main class="content">
+
+    <!-- MASTHEAD -->
+    <header class="masthead">
+      <div class="masthead-meta">
+        <span>Vol. I · No. 1</span>
+        <span>the company Engineering</span>
+      </div>
+      <h1 class="masthead-title">The GenAI <em>Reference</em></h1>
+      <div class="masthead-deck">A working compendium of agents, retrieval, memory, and evaluation — written for the engineers who build and the leaders who must explain.</div>
+      <div class="masthead-byline">Compiled for the Kuber underwriting platform · April 2026</div>
+    </header>
+
+    <!-- ──────────────── 01 — AGENTS ──────────────── -->
+    <section id="what-is-agent">
+      <span class="section-num">§ 01</span>
+      <h1>The Anatomy of an Agent</h1>
+      <p class="section-tagline">A definition that holds up under pressure — and the spectrum that separates real agents from clever scripts.</p>
+
+      <p class="drop-cap">An agent is the most overused word in the GenAI vocabulary. Vendors apply it to anything that calls a model. Frameworks apply it to anything they sell. The result is a word that means everything and therefore nothing. Strip it back to mechanics, and a precise definition emerges: an agent is an LLM that <strong>decides</strong> what to do next, <strong>uses tools</strong> to take actions, <strong>observes</strong> the results, and <strong>repeats</strong> until it reaches a goal.</p>
+
+      <p>Every word matters. Decides means autonomy — you do not hardcode the next step. Uses tools means it can affect the world beyond text generation. Observes means it reads the result of its actions. Repeats means there is a loop, not a single call. Together, these four properties form the ReAct pattern — Reason, Act, Observe — and that pattern is the litmus test.</p>
+
+      <blockquote>If it has a tool-calling loop, it is an agent. If it is a single LLM call or a fixed sequence of calls, it is not.</blockquote>
+
+      <h2>The Spectrum, From Function to Agent</h2>
+      <p>Most production systems contain a mix. In Kuber, here is how the components grade out:</p>
+
+      <table>
+        <thead>
+          <tr><th>Component</th><th>Agent?</th><th>Why</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>calculate_dti()</code></td><td>No</td><td>Pure function. No autonomy, no model.</td></tr>
+          <tr><td>Single <code>model.invoke()</code></td><td>No</td><td>One call, one response. No loop.</td></tr>
+          <tr><td>Sequential pipeline (Week 3)</td><td>No</td><td>Fixed order. The code chooses the next step, not the model.</td></tr>
+          <tr><td>FetchData with <code>create_react_agent</code></td><td><strong>Yes</strong></td><td>Receives a goal, picks tools, loops until satisfied.</td></tr>
+          <tr><td>RiskScoring agent</td><td><strong>Yes</strong></td><td>8 tools, decides which to call based on intermediate results.</td></tr>
+          <tr><td>LangGraph orchestrator</td><td><em>Meta-agent</em></td><td>Coordinates agents but does not loop tools itself. A state machine.</td></tr>
+        </tbody>
+      </table>
+
+      <h2>The Four Components of Every Agent</h2>
+      <p>Whatever framework you use — LangGraph, CrewAI, the bare Anthropic SDK — every agent has the same four parts:</p>
+
+      <ol>
+        <li><strong>An LLM</strong> — the reasoning engine. For Kuber, this is Claude Haiku for routine work and Claude Sonnet for complex reasoning.</li>
+        <li><strong>A tool registry</strong> — functions the model can call. Each tool has a name, a description, and a typed schema for inputs.</li>
+        <li><strong>A loop</strong> — the ReAct cycle. Send messages and tools to the model, receive a response, execute any tool calls, append results, repeat until the model produces a final answer or hits a stopping condition.</li>
+        <li><strong>A stopping condition</strong> — max iterations, a confidence threshold, an explicit "done" signal, or a token budget. Without one, an agent can loop forever.</li>
+      </ol>
+
+      <h2>Where Agents Fit in Kuber</h2>
+      <p>The four-agent underwriting pipeline is not arbitrary. Each agent boundary corresponds to a real-world failure mode that should be isolated:</p>
+
+      <div class="callout">
+        <div class="callout-title">Why Four Agents</div>
+        <strong>FetchData (Haiku)</strong> isolates external API risk — credit bureau timeouts cannot crash the rest. <strong>DocReview (Sonnet)</strong> isolates document quality issues — a bad scan does not affect risk scoring. <strong>RiskScoring (Haiku)</strong> handles graceful degradation — if the knowledge graph is down, the agent still scores using calculations and RAG. <strong>Compliance (Sonnet)</strong> is deliberately independent and has veto power — separation of concerns matching the organizational structure of the underwriting function itself.
+      </div>
+
+      <p>The agent boundary is where you want failures contained. The model boundary (Haiku vs Sonnet) is where you want cost optimized. These two boundaries do not have to align, but in Kuber they do.</p>
+    </section>
+
+    <div class="ornament">⁂ ⁂ ⁂</div>
+
+    <!-- ──────────────── 02 — RAG ──────────────── -->
+    <section id="rag">
+      <span class="section-num">§ 02</span>
+      <h1>RAG, All Eight Strategies</h1>
+      <p class="section-tagline">Retrieval is not one technique. It is a stack of choices, and the right choice depends on the question being asked.</p>
+
+      <p class="drop-cap">Retrieval-Augmented Generation began as a simple idea — embed your documents, find the closest matches to a query, hand them to the model. That naive version works for prototypes and fails for production. Real systems combine multiple retrieval techniques layered on top of each other. By the end of Week 3, the Kuber pipeline used eight distinct strategies, and understanding when to apply each one is the difference between a system that hallucinates and one that is auditable.</p>
+
+      <h2>What Lives in the Vector Database</h2>
+      <p>Before strategies, mechanics. Every record in the vector store has three components stored together:</p>
+
+      <ul>
+        <li>The <strong>embedding</strong> — a vector of floating-point numbers (1024 dimensions for Titan Embed). Used for similarity search. Never read by the LLM directly.</li>
+        <li>The <strong>page_content</strong> — the actual text chunk. This is what the model reads as context.</li>
+        <li>The <strong>metadata</strong> — structured tags like jurisdiction, document source, page number, topic. Used for filtering before the search runs.</li>
+      </ul>
+
+      <p>The original document still lives in S3 for regulatory and audit purposes. The vector store is the working copy.</p>
+
+      <h2>The Eight Strategies</h2>
+
+      <div class="strategy-grid">
+
+        <div class="strategy-card">
+          <div class="strategy-num">STRATEGY 01</div>
+          <div class="strategy-title">Basic RAG</div>
+          <div class="strategy-meta"><span>1 LLM call</span><span>~$0.001</span><span>Prototyping</span></div>
+          <div class="strategy-desc">Embed documents, embed the query, return top-k by cosine similarity, send to the model. The simplest possible RAG. Good for general conceptual questions, fails on exact-term lookup and quality.</div>
+        </div>
+
+        <div class="strategy-card">
+          <div class="strategy-num">STRATEGY 02</div>
+          <div class="strategy-title">Hybrid Search (Vector + BM25)</div>
+          <div class="strategy-meta"><span>1 LLM call</span><span>~$0.001</span><span>Mixed content</span></div>
+          <div class="strategy-desc">Combine semantic search (catches "debt-to-income" when the query says "DTI") with keyword search (catches "Section 50(a)(6)" by exact match). Essential for regulatory content where concepts and exact references both matter.</div>
+        </div>
+
+        <div class="strategy-card">
+          <div class="strategy-num">STRATEGY 03</div>
+          <div class="strategy-title">Re-Ranking</div>
+          <div class="strategy-meta"><span>1 LLM + local cross-encoder</span><span>~$0.001</span><span>Precision-critical</span></div>
+          <div class="strategy-desc">Retrieve top-10 with broad search, then re-rank with a cross-encoder that scores query and document together. Promotes the most relevant document from rank 4 to rank 1. The cross-encoder is a small local model — 50ms, free.</div>
+        </div>
+
+        <div class="strategy-card">
+          <div class="strategy-num">STRATEGY 04</div>
+          <div class="strategy-title">Metadata Filtering</div>
+          <div class="strategy-meta"><span>1 LLM call</span><span>~$0.001</span><span>Jurisdiction lookup</span></div>
+          <div class="strategy-desc">Filter by structured metadata <em>before</em> semantic search runs. Narrow 500,000 chunks down to 3,000 Texas conventional chunks first, then embed-search the subset. 99.4% of the corpus eliminated in a database operation, free.</div>
+        </div>
+
+        <div class="strategy-card primary">
+          <div class="strategy-num">STRATEGY 05</div>
+          <div class="strategy-title">Smart RAG <span class="badge primary">Kuber Primary</span></div>
+          <div class="strategy-meta"><span>1 LLM call</span><span>~$0.001</span><span>Production default</span></div>
+          <div class="strategy-desc">Deterministic query templates for known topics, synonym expansion, metadata filtering, and a single LLM call that grades relevance, answers, cites sources, and self-checks for hallucination — all in one structured response. Combines strategies 2, 4, and 8 into one production-ready approach.</div>
+        </div>
+
+        <div class="strategy-card expensive">
+          <div class="strategy-num">STRATEGY 06</div>
+          <div class="strategy-title">Agentic RAG <span class="badge expensive">Critical Compliance</span></div>
+          <div class="strategy-meta"><span>5–10 LLM calls</span><span>$0.005–$0.010</span><span>Highest confidence</span></div>
+          <div class="strategy-desc">Separate LLM calls for grading each retrieved document, optional query rewriting, generation from verified documents only, and an independent hallucination check. Slow and expensive — reserved for compliance-critical questions where a wrong answer carries legal consequences.</div>
+        </div>
+
+        <div class="strategy-card">
+          <div class="strategy-num">STRATEGY 07</div>
+          <div class="strategy-title">Parent-Child Chunks</div>
+          <div class="strategy-meta"><span>1 LLM call</span><span>~$0.001</span><span>Context preservation</span></div>
+          <div class="strategy-desc">Embed small child chunks for precise matching, but return the larger parent chunk as context to the model. Solves the tradeoff between precision (small chunks find specific facts) and context (large chunks preserve meaning).</div>
+        </div>
+
+        <div class="strategy-card">
+          <div class="strategy-num">STRATEGY 08</div>
+          <div class="strategy-title">Context-Enriched Chunks</div>
+          <div class="strategy-meta"><span>1 LLM call</span><span>~$0.001</span><span>Document identity</span></div>
+          <div class="strategy-desc">Each chunk's text is prefixed with "From document X, section Y." This ensures the embedding captures not just the chunk content but its provenance — useful when the same fact appears in multiple sources and you need to know which one.</div>
+        </div>
+
+      </div>
+
+      <h2>Strategies Combine — They Are Not Mutually Exclusive</h2>
+      <p>The eight strategies are not a menu where you pick one. Real systems stack them. Smart RAG (Strategy 5) already includes metadata filtering (Strategy 4) and context-enriched chunks (Strategy 8). Agentic RAG (Strategy 6) builds on Smart RAG with separate verification. For maximum precision on a critical query, you stack everything:</p>
+
+      <div class="diagram">Maximum-precision stack:
+
+  Strategy 4 (metadata filter)
+    + Strategy 2 (hybrid search)
+    + Strategy 3 (re-ranking)
+    + Strategy 7 (parent-child)
+    + Strategy 6 (separate grading + verification)
+  = Every technique layered. Expensive. Maximum confidence.</div>
+
+      <h2>The Decision Tree</h2>
+      <p>For Kuber, the choice is rarely "which strategy" but "which combination." The decision comes down to three questions:</p>
+
+      <div class="diagram">Is this a KNOWN topic (DTI, FICO, LTV)?
+│
+├── YES — Is it compliance-CRITICAL (legal consequences)?
+│   │
+│   ├── YES → Strategy 6 (Agentic RAG)
+│   │         Separate grading + verification
+│   │         ~$0.005–$0.010, highest confidence
+│   │
+│   └── NO  → Strategy 5 (Smart RAG)  ← PRIMARY
+│             Deterministic query + 1 LLM call
+│             ~$0.001, good enough for most queries
+│
+└── NO  — Is it searching a LARGE document?
+    │
+    ├── YES — Mixes concepts and exact references?
+    │   │
+    │   ├── YES → Strategies 2 + 3 + 7 stacked
+    │   └── NO  → Strategies 2 + 4
+    │
+    └── NO  → Strategy 1 (Basic RAG)</div>
+
+      <h2>What RAG Cannot Do</h2>
+      <p>A note on the limits of retrieval: RAG is designed to answer specific questions about a known corpus. It is not designed for general questions. If a borrower asks "what is the housing market like in Austin," RAG over your lending policy documents will return policy text — useless. That is a question for the model alone, not for retrieval. Knowing when not to use RAG is as important as knowing how to use it.</p>
+    </section>
+
+    <div class="ornament">⁂ ⁂ ⁂</div>
+
+    <!-- ──────────────── 03 — MEMORY ──────────────── -->
+    <section id="memory">
+      <span class="section-num">§ 03</span>
+      <h1>Memory &amp; Context Management</h1>
+      <p class="section-tagline">Three layers of state, each with a different purpose, lifetime, and storage backend.</p>
+
+      <p class="drop-cap">LLMs are stateless. Every API call is independent. The model has no memory of yesterday's conversation, no awareness of the previous request, no persistent state. Everything the model "knows" must arrive in the current message. This single fact governs everything about agent memory: there is no memory, only the engineering you do to simulate it.</p>
+
+      <p>Production systems organize this engineering into three distinct layers, each solving a different problem with a different mechanism.</p>
+
+      <h2>Layer One: Within a Single Agent Invocation</h2>
+      <p>This is the agent scratchpad — the message list that accumulates during one ReAct loop. The agent sends a prompt, gets a tool call, executes the tool, appends the result, sends the updated message list back to the model, and so on. The scratchpad lives in memory <em>during</em> the invocation and is gone the moment the invocation completes.</p>
+
+      <div class="callout">
+        <div class="callout-title">Java Analogy</div>
+        Local variables in a method call. They exist on the stack while the method runs and are gone when the method returns. You do not persist method-local variables. The agent scratchpad is the same — short-lived working memory for one invocation.
+      </div>
+
+      <p>For Kuber, a single agent invocation lasts 3–10 seconds and involves 5–15 tool calls. The scratchpad never exceeds context limits. No special handling required.</p>
+
+      <h2>Layer Two: Between Nodes in a Pipeline (Checkpointing)</h2>
+      <p>This is where LangGraph's checkpointer earns its keep. After each node executes, the entire pipeline state is serialized to a persistent store. If the system crashes between nodes, the next instance loads the state from the checkpoint and resumes exactly where the previous instance stopped.</p>
+
+      <pre><code>Node 1 (FetchData) executes  → state saved to Redis
+                                (borrower_package populated)
+Node 2 (DocReview) executes  → state saved to Redis  
+                                (document_review populated)
+[CONTAINER CRASHES]
+Node 3 (RiskScoring) never ran
+[NEW CONTAINER STARTS]
+                              → load state from Redis
+                              → resume at Node 3 with prior state intact</code></pre>
+
+      <h3>Checkpoint Storage Options</h3>
+      <table>
+        <thead>
+          <tr><th>Backend</th><th>Persistence</th><th>Use For</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><strong>MemorySaver</strong></td><td>None (in-memory)</td><td>Local development only</td></tr>
+          <tr><td><strong>SqliteSaver</strong></td><td>File-based</td><td>Local dev with restart survival</td></tr>
+          <tr><td><strong>Redis</strong></td><td>Production-grade</td><td><strong>Kuber's choice.</strong> Sub-millisecond, TTL support, already in the stack.</td></tr>
+          <tr><td><strong>PostgreSQL</strong></td><td>Production-grade</td><td>When you need to query checkpoint data for analytics</td></tr>
+          <tr><td><strong>DynamoDB</strong></td><td>Production-grade</td><td>AWS-native, fully managed, pay-per-request</td></tr>
+        </tbody>
+      </table>
+
+      <h2>Layer Three: Long-Term Conversation History</h2>
+      <p>If your system has a chat interface where a user converses with the agent across hours or days, that conversation history needs persistent storage. This is <em>your</em> responsibility — LangGraph manages pipeline state, not chat history. For Kuber, this layer stores final loan decisions, audit trails, and human review notes in DocumentDB.</p>
+
+      <h2>Context Window Management</h2>
+      <p>Even with all three layers, you eventually face a more fundamental problem: context windows are finite. Claude Sonnet has 200,000 tokens. If a conversation grows past that limit, something must be dropped. Four strategies:</p>
+
+      <ol>
+        <li><strong>Summarization</strong> — periodically replace older messages with an LLM-generated summary. Preserves key facts, drops verbose tool results. LangChain's <code>ConversationSummaryBufferMemory</code> automates this.</li>
+        <li><strong>Trimming</strong> — drop the oldest messages, keep the most recent N. Cheap (no LLM call), lossy (you may lose important early context).</li>
+        <li><strong>Selective retention</strong> — keep system prompt, keep tool results, drop intermediate reasoning. More sophisticated, preserves the most useful context per token.</li>
+        <li><strong>External fact storage</strong> — extract facts from conversations and store them as structured data outside the conversation. The conversation gets compressed; the facts persist forever. This is how Claude.ai's memory feature works.</li>
+      </ol>
+
+      <p>For Kuber's pipeline, none of this applies. Each loan evaluation is a self-contained graph execution with maybe 10,000 tokens total. Compression only matters for long-running chat sessions.</p>
+
+      <h2>The Critical Distinction</h2>
+      <blockquote>Facts persist indefinitely. Conversation history gets compressed or dropped.</blockquote>
+      <p>Production memory systems separate <em>what the user is</em> (facts: name, role, preferences, project context) from <em>what was said</em> (conversation: the literal back-and-forth). Facts are stored in a structured database and retrieved on every conversation. Conversation history gets summarized when it grows too long. This separation is the difference between an assistant that "remembers" you and a chatbot that forgets everything between sessions.</p>
+    </section>
+
+    <div class="ornament">⁂ ⁂ ⁂</div>
+
+    <!-- ──────────────── 04 — EVALS ──────────────── -->
+    <section id="evals">
+      <span class="section-num">§ 04</span>
+      <h1>Evaluating Agents</h1>
+      <p class="section-tagline">How to prove that an AI system actually works — and to whom you have to prove it.</p>
+
+      <p class="drop-cap">An agent that works in development is not the same as an agent that works in production. The gap between "the demo passes" and "we can defend this to the risk committee" is filled with evaluation. Without it, you are shipping a search engine with a language model bolted on and hoping for the best. With it, you can quantify quality, catch regressions, and produce evidence — the kind a regulator can read.</p>
+
+      <h2>The Two Categories of Evaluation</h2>
+
+      <div class="vs-block">
+        <div class="vs-side">
+          <h4>Offline Evaluation</h4>
+          <p>Run a fixed dataset of test cases (ideally 500+) through the system. Compare outputs to known-good answers verified by humans. Track scores over time. This is how you prove the system works before deployment and after every prompt change.</p>
+        </div>
+        <div class="vs-divider">vs.</div>
+        <div class="vs-side">
+          <h4>Online Evaluation</h4>
+          <p>Sample production traffic, score it asynchronously, push the scores back to your observability platform. This is how you detect quality degradation in production before users notice — prompt drift, model version changes, retrieval regression.</p>
+        </div>
+      </div>
+
+      <h2>The Four Core RAG Metrics</h2>
+      <p>For any RAG-based system, four metrics matter. Two evaluate retrieval quality, two evaluate generation quality. Together they form the standard developed by the Ragas framework and adopted across the industry.</p>
+
+      <table>
+        <thead>
+          <tr><th>Metric</th><th>Layer</th><th>Question</th><th>Diagnoses</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><strong>Faithfulness</strong></td><td>Generation</td><td>Is the answer grounded in retrieved context?</td><td>Hallucination, fabricated facts</td></tr>
+          <tr><td><strong>Answer Relevancy</strong></td><td>Generation</td><td>Does the answer address the question asked?</td><td>Off-topic, wrong tool selected</td></tr>
+          <tr><td><strong>Context Precision</strong></td><td>Retrieval</td><td>Are the retrieved docs actually relevant?</td><td>Bad metadata, embedding drift</td></tr>
+          <tr><td><strong>Context Recall</strong></td><td>Retrieval</td><td>Did we retrieve <em>all</em> relevant info?</td><td>Top-k too low, bad chunking</td></tr>
+        </tbody>
+      </table>
+
+      <h2>Faithfulness — The Worked Example</h2>
+      <p>Faithfulness is the most important metric for compliance work. It measures hallucination directly. Here is how it works:</p>
+
+      <div class="callout">
+        <div class="callout-title">A Faithfulness Calculation</div>
+        <strong>Question:</strong> What is the maximum DTI for a Texas conventional QM?<br><br>
+        <strong>Retrieved context:</strong> "For Texas conventional qualified mortgages, the maximum DTI ratio is 43%. Compensating factors may be considered for DTIs between 38% and 43%."<br><br>
+        <strong>Generated answer:</strong> "The maximum DTI is 43%, with compensating factors above 38%. The borrower must also have a minimum FICO of 680."<br><br>
+        <strong>Claims extracted from the answer:</strong>
+        <ul style="margin-top: 8px;">
+          <li>Maximum DTI is 43% — supported by context ✓</li>
+          <li>Compensating factors above 38% — supported ✓</li>
+          <li>Minimum FICO of 680 — <strong>NOT in context — fabricated</strong> ✗</li>
+        </ul>
+        <strong>Faithfulness = 2 supported / 3 total = 0.67</strong><br><br>
+        For compliance work, anything below 0.95 is unacceptable. A single fabricated claim could expose the company to regulatory risk.
+      </div>
+
+      <h2>The Tooling Landscape</h2>
+      <p>Five tools matter, each with a different role:</p>
+
+      <table>
+        <thead>
+          <tr><th>Tool</th><th>What It Does</th><th>When to Use</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><strong>Ragas</strong></td><td>Open-source RAG-specific metrics (the four above plus 20 more)</td><td>Development analysis, exploratory evaluation, synthetic test generation</td></tr>
+          <tr><td><strong>DeepEval</strong></td><td>Pytest-style LLM testing for CI/CD pipelines</td><td>Quality gates before merge — every PR must pass</td></tr>
+          <tr><td><strong>LangSmith</strong></td><td>Tracing + evaluation datasets + trajectory checks</td><td>Development debugging, dataset management</td></tr>
+          <tr><td><strong>Bedrock Evaluations</strong></td><td>Three levels: Model Eval, Knowledge Base Eval, AgentCore Eval</td><td><strong>Production</strong> — stays in AWS VPC, no data exfiltration</td></tr>
+          <tr><td><strong>Manual / human</strong></td><td>The gold standard, slow and expensive</td><td>Final validation before shipping, edge cases, risk committee sign-off</td></tr>
+        </tbody>
+      </table>
+
+      <h2>Trajectory Evaluation — The Underrated Metric</h2>
+      <p>For agents specifically, output correctness is not enough. You also need to verify <em>how</em> the agent got there. A trajectory evaluator checks whether the agent called the right tools in the right order. Example rule for the Risk Scoring agent:</p>
+
+      <pre><code># Trajectory check
+required_tools = [
+    "pull_borrower_data",
+    "calculate_dti",
+    "search_lending_policies"
+]
+missing = [t for t in required_tools if t not in actual_tool_calls]
+score = 1.0 if not missing else 0.0</code></pre>
+
+      <p>This catches the scenario where the agent produces a reasonable-looking answer but skipped a critical step. Output checks alone would miss it. Trajectory checks catch it every time.</p>
+
+      <h2>The Kuber Evaluation Stack</h2>
+      <p>The right combination depends on the phase:</p>
+
+      <div class="strategy-grid">
+        <div class="strategy-card primary">
+          <div class="strategy-num">DEVELOPMENT</div>
+          <div class="strategy-title">LangSmith + Ragas</div>
+          <div class="strategy-desc">LangSmith Cloud free tier for tracing and dataset management. Ragas for deeper RAG-specific metrics and synthetic test data generation. Iterate fast, debug aggressively.</div>
+        </div>
+        <div class="strategy-card">
+          <div class="strategy-num">CI/CD</div>
+          <div class="strategy-title">DeepEval Quality Gates</div>
+          <div class="strategy-desc">Every pull request that touches a prompt or agent must pass a pytest suite of evaluation tests. Faithfulness threshold 0.95. Trajectory checks for each agent. No merge without green builds.</div>
+        </div>
+        <div class="strategy-card expensive">
+          <div class="strategy-num">PRODUCTION</div>
+          <div class="strategy-title">Bedrock Evaluations + Langfuse</div>
+          <div class="strategy-desc">Bedrock AgentCore Evaluations with code-based Lambda evaluators for deterministic compliance checks. Langfuse self-hosted in the company's VPC for tracing. Sample 5–10% of production traffic for quality monitoring.</div>
+        </div>
+      </div>
+    </section>
+
+    <div class="ornament">⁂ ⁂ ⁂</div>
+
+    <!-- ──────────────── 05 — BEDROCK ──────────────── -->
+    <section id="bedrock">
+      <span class="section-num">§ 05</span>
+      <h1>The Bedrock Toolkit</h1>
+      <p class="section-tagline">What AWS provides natively, and why you might still need everything else.</p>
+
+      <p class="drop-cap">Most of the GenAI ecosystem treats AWS Bedrock as a simple model-hosting service — a way to call Claude or Llama without managing your own infrastructure. That undersells it. Bedrock is a layered platform: inference, evaluation, safety, customization, and agent orchestration are all native services. Knowing what Bedrock provides is the difference between buying tools you do not need and reinventing tools you already have.</p>
+
+      <h2>The Five Pillars of Bedrock</h2>
+
+      <table>
+        <thead>
+          <tr><th>Service</th><th>What It Does</th><th>Kuber Use</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><strong>Bedrock Runtime</strong></td><td>Inference API — invoke models, including streaming and tool use. Unified API across providers via Converse.</td><td>Every Claude call in the pipeline</td></tr>
+          <tr><td><strong>Bedrock Knowledge Bases</strong></td><td>Managed RAG — connect S3 documents, auto-chunk and embed, query via API.</td><td>Optional alternative to OpenSearch RAG. Limited control.</td></tr>
+          <tr><td><strong>Bedrock Guardrails</strong></td><td>Content filtering, PII redaction, denied topics, prompt injection detection.</td><td>Wraps every agent call. the company compliance requirement.</td></tr>
+          <tr><td><strong>Bedrock Evaluations</strong></td><td>Model Eval, Knowledge Base Eval, AgentCore Eval — three levels of quality measurement.</td><td>Production evaluation. Stays in VPC.</td></tr>
+          <tr><td><strong>Bedrock AgentCore</strong></td><td>Managed agent runtime with memory, identity, gateway, browser tools, observability.</td><td>Alternative to LangGraph for managed orchestration.</td></tr>
+        </tbody>
+      </table>
+
+      <h2>What Bedrock Does Not Do (Well)</h2>
+      <p>Bedrock is strong but not universal. Three notable gaps:</p>
+
+      <ul>
+        <li><strong>Claude fine-tuning is not available.</strong> Bedrock supports fine-tuning for Titan, Llama, Cohere, and Nova models. Claude is excluded. If you need to customize a Claude model, you cannot — your only options are prompt engineering, distillation to a fine-tunable model, or working with Anthropic directly.</li>
+        <li><strong>Knowledge Bases are opaque.</strong> Bedrock's managed RAG locks you into specific chunking strategies and vector stores. Teams often start with Knowledge Bases, hit a wall, and rebuild on OpenSearch or Pinecone for control over retrieval logic.</li>
+        <li><strong>No semantic caching.</strong> Bedrock has no built-in semantic cache. If 100 users ask the same question, you pay for 100 inferences. You can build your own cache layer (Redis + embedding similarity) but it is not provided.</li>
+      </ul>
+
+      <h2>Three Bedrock Features Worth Knowing</h2>
+
+      <h3>Prompt Caching</h3>
+      <p>Bedrock can cache the KV (key-value) computations from processing your prompt prefix. The first call computes everything. Subsequent calls with the same prefix skip the computation and load the cached result, billing those tokens at a 90% discount. For Kuber's compliance agent processing batches of similar loans, this saves 84% on input costs. The cache is invoked via a <code>cache_control</code> marker on the system prompt and policy context.</p>
+
+      <h3>Extended Thinking</h3>
+      <p>Claude Sonnet 3.7 and newer support extended thinking — a private scratchpad where the model reasons through a problem before producing the final answer. Thinking tokens are billed as output tokens. For complex multi-step reasoning (like checking whether a loan violates three different Texas regulations simultaneously), extended thinking catches nuances the standard mode misses. Use it on the Compliance agent. Skip it on FetchData.</p>
+
+      <h3>AgentCore Evaluations with Lambda Graders</h3>
+      <p>The newest and most relevant Bedrock feature for Kuber. AgentCore Evaluations launched GA in March 2026 with thirteen built-in evaluators plus support for custom Lambda-based graders. The Lambda graders are critical because they are deterministic — an LLM-as-judge cannot reliably verify "did the response include the exact DTI value of 40.4 percent," but a Python function in Lambda can. For compliance checks, deterministic evaluation is non-negotiable.</p>
+
+      <h2>The Bedrock Cost Map</h2>
+      <p>Cost varies by 100× across Bedrock models. The single largest optimization is choosing the right model per task:</p>
+
+      <table>
+        <thead>
+          <tr><th>Model</th><th>Input ($/1M tok)</th><th>Output ($/1M tok)</th><th>Use For</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Nova Micro</td><td>$0.035</td><td>$0.14</td><td>Simple classification, routing</td></tr>
+          <tr><td>Claude Haiku</td><td>$1.00</td><td>$5.00</td><td>FetchData, RiskScoring (Kuber)</td></tr>
+          <tr><td>Claude Sonnet</td><td>$3.00</td><td>$15.00</td><td>DocReview, Compliance (Kuber)</td></tr>
+          <tr><td>Claude Opus</td><td>$15.00</td><td>$75.00</td><td>Most complex reasoning, rarely needed</td></tr>
+        </tbody>
+      </table>
+
+      <p>Routing simple tasks to Nova Micro instead of Claude Sonnet is an 85× cost reduction with no quality loss for the right tasks. Most teams overspend by defaulting to premium models for work that smaller models handle perfectly.</p>
+    </section>
+
+    <div class="ornament">⁂ ⁂ ⁂</div>
+
+    <!-- ──────────────── 06 — DECISIONS ──────────────── -->
+    <section id="decisions">
+      <span class="section-num">§ 06</span>
+      <h1>Decisions for Kuber</h1>
+      <p class="section-tagline">A consolidated record of every architectural choice made over six weeks — and the reasoning behind it.</p>
+
+      <p class="drop-cap">Six weeks of construction produced a system. They also produced dozens of architectural decisions, each with tradeoffs, each defended at the time, each worth recording for the next engineer who has to explain them. This is that record.</p>
+
+      <h2>Orchestration</h2>
+      <table>
+        <thead><tr><th>Decision</th><th>Choice</th><th>Why</th></tr></thead>
+        <tbody>
+          <tr><td>Framework</td><td>LangGraph</td><td>Typed state, parallel execution, checkpointing, human-in-the-loop. CrewAI is simpler but less control. AutoGen is for research, not pipelines.</td></tr>
+          <tr><td>Execution model</td><td>Single ECS Fargate service</td><td>Persistent Redis connections, no Lambda cold starts, 15-min timeout limit avoided.</td></tr>
+          <tr><td>Checkpointing</td><td>Redis</td><td>Already in the stack. Sub-millisecond. Right access pattern (key-value with TTL).</td></tr>
+        </tbody>
+      </table>
+
+      <h2>Models</h2>
+      <table>
+        <thead><tr><th>Agent</th><th>Model</th><th>Why</th></tr></thead>
+        <tbody>
+          <tr><td>FetchData</td><td>Claude Haiku</td><td>Simple structured extraction. Cost optimized.</td></tr>
+          <tr><td>DocReview</td><td>Claude Sonnet</td><td>Complex document understanding. Vision capability needed.</td></tr>
+          <tr><td>RiskScoring</td><td>Claude Haiku</td><td>Calculation-heavy with deterministic rules. Haiku sufficient.</td></tr>
+          <tr><td>Compliance</td><td>Claude Sonnet + Extended Thinking</td><td>Regulatory reasoning has legal consequences. Frontier model justified.</td></tr>
+        </tbody>
+      </table>
+
+      <h2>Retrieval</h2>
+      <table>
+        <thead><tr><th>Component</th><th>Choice</th><th>Why</th></tr></thead>
+        <tbody>
+          <tr><td>Vector store</td><td>OpenSearch (production), FAISS (dev)</td><td>OpenSearch supports hybrid search natively. FAISS is fine for local iteration.</td></tr>
+          <tr><td>Embedding model</td><td>Titan Embed v2 (1024-dim)</td><td>Native to Bedrock, no extra service.</td></tr>
+          <tr><td>Primary RAG strategy</td><td>Smart RAG (Strategy 5)</td><td>One LLM call. Combines metadata filtering, hybrid search, structured output, self-check.</td></tr>
+          <tr><td>Critical compliance RAG</td><td>Agentic RAG (Strategy 6)</td><td>Separate grading and verification. Higher cost justified by legal risk.</td></tr>
+        </tbody>
+      </table>
+
+      <h2>Production Hardening</h2>
+      <table>
+        <thead><tr><th>Concern</th><th>Solution</th></tr></thead>
+        <tbody>
+          <tr><td>Content safety</td><td>Bedrock Guardrails on every agent call</td></tr>
+          <tr><td>Document processing cost</td><td>Textract hybrid — standard forms via Textract, narrative via Vision. 47% cost reduction.</td></tr>
+          <tr><td>External API resilience</td><td>Retry with exponential backoff + circuit breaker per service</td></tr>
+          <tr><td>Crash recovery</td><td>LangGraph checkpointing to Redis after every node</td></tr>
+          <tr><td>Cost optimization</td><td>Prompt caching on system prompt and policy context. 84% input savings.</td></tr>
+        </tbody>
+      </table>
+
+      <h2>Deployment</h2>
+      <table>
+        <thead><tr><th>Component</th><th>Choice</th></tr></thead>
+        <tbody>
+          <tr><td>API layer</td><td>FastAPI with async submit/poll pattern (HTTP 202)</td></tr>
+          <tr><td>UI</td><td>Streamlit for internal underwriter dashboard</td></tr>
+          <tr><td>Container runtime</td><td>ECS Fargate (separate services for FastAPI and Streamlit)</td></tr>
+          <tr><td>Auto-scaling</td><td>2–8 tasks based on CPU (60% scale up, 30% scale down)</td></tr>
+          <tr><td>Observability</td><td>LangSmith Cloud (dev), Langfuse self-hosted (production)</td></tr>
+        </tbody>
+      </table>
+
+      <h2>The Things That Did Not Make the Cut</h2>
+      <p>Equally important: what was considered and rejected.</p>
+
+      <ul>
+        <li><strong>Fine-tuning Claude.</strong> Not supported on Bedrock. Even if it were, the cost of training data preparation and ongoing retraining would exceed the inference savings at Kuber's volume.</li>
+        <li><strong>LangServe.</strong> Auto-generated FastAPI from LangGraph code. Fast for prototyping, too opaque for a the company API contract that the Java team needs to consume.</li>
+        <li><strong>Bedrock Knowledge Bases.</strong> Managed RAG that locks you into specific chunking and retrieval. Custom OpenSearch + Smart RAG gives more control.</li>
+        <li><strong>Bedrock AgentCore.</strong> Promising but newer than LangGraph. Revisit in 12 months.</li>
+        <li><strong>React for the UI.</strong> Overkill for an internal dashboard built by a Python + Java team. Streamlit is sufficient. Rebuild later if the UI ever goes external-facing.</li>
+      </ul>
+
+      <h2>What Remains to Be Done</h2>
+      <p>The system is architecturally complete. The remaining work is organizational, not technical — coordinating with the company's AI platform team for ECS Fargate deployment, IAM roles, Secrets Manager integration, CloudWatch alerting, and the production readiness checklist. The hard part — turning a six-week learning sprint into a defensible production architecture — is done.</p>
+
+      <blockquote>The model is commodity. The orchestration, evaluation, and integration are where the value lives.</blockquote>
+    </section>
+
+    <!-- ──────────────── COLOPHON ──────────────── -->
+    <div class="colophon">
+      <div class="colophon-mark">FIN.</div>
+      Compiled in April 2026 from six weeks of construction, conversation, and revision.<br>
+      Set in <em>Fraunces</em> for serif text, <em>Inter Tight</em> for sans, <em>JetBrains Mono</em> for code.<br>
+      For internal the company reference. Kuber underwriting platform.
+    </div>
+
+  </main>
+</div>
+
+</body>
+</html>
